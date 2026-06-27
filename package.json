@@ -1,6 +1,6 @@
 ﻿{
   "name": "@preepo/allykit",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "AllyKit — a lightweight, zero-dependency accessibility toolkit for any webpage. Text size, contrast modes, dyslexia font, screen reader, ADHD focus mode, and more.",
   "main": "ally-kit.js",
   "module": "ally-kit.js",
@@ -14,6 +14,7 @@
   },
   "files": [
     "ally-kit.js",
+    "ally-kit-min.js",
     "open-dyslexic.woff",
     "README.md",
     "LICENSE"
