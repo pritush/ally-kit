@@ -52,7 +52,7 @@
   
   <!-- PARTIAL CONFIGURATION: Only disable 3 specific features -->
   <script>
-    window.AllyWidgetConfig = {
+    window.AllyKitConfig = {
       features: {
         // Only specify what we want to disable
         adhd: false,
@@ -63,7 +63,7 @@
     };
   </script>
   
-  <script src="ally-widget.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/pritush/ally-kit@master/ally-kit-min.js"></script>
 </head>
 <body>
   <h1>🎯 Partial Configuration Test</h1>
@@ -110,7 +110,7 @@
 
   <h2>Configuration Code</h2>
   <p>Notice how simple this is - only 3 lines!</p>
-  <pre><code>window.AllyWidgetConfig = {
+  <pre><code>window.AllyKitConfig = {
   features: {
     adhd: false,
     hideImages: false,

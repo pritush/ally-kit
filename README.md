@@ -51,8 +51,17 @@ All 13 features are **enabled by default**. Any subset can be disabled via confi
 
 ### Plain HTML (no build step)
 
+Use `ally-kit.js` for development (readable, with comments) or `ally-kit-min.js` for production (minified, smaller payload):
+
 ```html
+<!-- Development — readable source -->
 <script src="ally-kit.js"></script>
+</body>
+```
+
+```html
+<!-- Production — minified (~20 % smaller) -->
+<script src="ally-kit-min.js"></script>
 </body>
 ```
 
@@ -69,13 +78,21 @@ npm install @preepo/allykit
 Via GitHub (works as soon as the repo is public — no publish needed):
 
 ```html
+<!-- Unminified -->
 <script src="https://cdn.jsdelivr.net/gh/pritush/ally-kit@main/ally-kit.js"></script>
+
+<!-- Minified -->
+<script src="https://cdn.jsdelivr.net/gh/pritush/ally-kit@main/ally-kit-min.js"></script>
 ```
 
 Via npm (works after `npm publish`):
 
 ```html
+<!-- Unminified -->
 <script src="https://cdn.jsdelivr.net/npm/@preepo/allykit/ally-kit.js"></script>
+
+<!-- Minified -->
+<script src="https://cdn.jsdelivr.net/npm/@preepo/allykit/ally-kit-min.js"></script>
 ```
 
 ---
@@ -514,8 +531,9 @@ AllyKit uses Shadow DOM, `MutationObserver`, `localStorage`, and optionally `Spe
 
 1. Fork the repo and create a feature branch.
 2. Make your changes in `ally-kit.js` — the entire toolkit lives in one self-contained UMD file.
-3. Test against `index.html` which exercises every feature.
-4. Open a pull request with a clear description of what changed and why.
+3. Regenerate `ally-kit-min.js` from the updated source (e.g. `npm run build` or your minifier of choice).
+4. Test against `index.html` which exercises every feature.
+5. Open a pull request with a clear description of what changed and why.
 
 ### Things to keep in mind
 
