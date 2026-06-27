@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Minimal Features Test - Ally Widget</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 40px 20px;
+      line-height: 1.6;
+    }
+    
+    .status {
+      background: #d4edda;
+      border: 1px solid #c3e6cb;
+      color: #155724;
+      padding: 20px;
+      border-radius: 8px;
+      margin: 30px 0;
+    }
+    
+    .feature-list {
+      background: #f8f9fa;
+      padding: 20px;
+      border-radius: 8px;
+      margin: 20px 0;
+    }
+    
+    .enabled { color: #28a745; font-weight: bold; }
+    .disabled { color: #dc3545; font-weight: bold; }
+    
+    code {
+      background: #e9ecef;
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-family: monospace;
+    }
+  </style>
+  
+  <!-- MINIMAL CONFIGURATION: Only 6 features enabled -->
+  <script>
+    window.AllyWidgetConfig = {
+      features: {
+        textSize: true,
+        highContrast: true,
+        dyslexia: true,
+        bigCursor: true,
+        pauseAnimation: true,
+        screenReader: true,
+        // Disabled features
+        textSpacing: false,
+        lineHeight: false,
+        adhd: false,
+        saturation: false,
+        invert: false,
+        hideImages: false,
+        highlightLinks: false
+      }
+    };
+  </script>
+  
+  <script src="ally-widget.js"></script>
+</head>
+<body>
+  <h1>✅ Minimal Configuration Test</h1>
+  
+  <div class="status">
+    <strong>Configuration Active:</strong> This page uses a minimal configuration with only 6 features enabled.
+  </div>
+
+  <h2>Test Instructions</h2>
+  <ol>
+    <li>Open the accessibility widget (button in bottom-right corner or press <code>Ctrl+F2</code>)</li>
+    <li>Verify that you see <strong>only 6 feature buttons</strong> in the panel</li>
+    <li>The disabled features should not appear at all</li>
+  </ol>
+
+  <div class="feature-list">
+    <h3>Expected Features in Widget:</h3>
+    <ul>
+      <li><span class="enabled">✓ Text Size</span> - Should be visible</li>
+      <li><span class="enabled">✓ High Contrast</span> - Should be visible</li>
+      <li><span class="enabled">✓ Dyslexia Friendly</span> - Should be visible</li>
+      <li><span class="enabled">✓ Big Cursor</span> - Should be visible</li>
+      <li><span class="enabled">✓ Pause Animation</span> - Should be visible</li>
+      <li><span class="enabled">✓ Screen Reader</span> - Should be visible</li>
+    </ul>
+    
+    <h3>Features That Should NOT Appear:</h3>
+    <ul>
+      <li><span class="disabled">✗ Text Spacing</span> - Hidden</li>
+      <li><span class="disabled">✗ Line Height</span> - Hidden</li>
+      <li><span class="disabled">✗ ADHD Mode</span> - Hidden</li>
+      <li><span class="disabled">✗ Saturation</span> - Hidden</li>
+      <li><span class="disabled">✗ Invert Color</span> - Hidden</li>
+      <li><span class="disabled">✗ Hide Images</span> - Hidden</li>
+      <li><span class="disabled">✗ Highlight Links</span> - Hidden</li>
+    </ul>
+  </div>
+
+  <h2>Sample Content</h2>
+  <p>
+    Lorem ipsum dolor sit amet, consectetur adipiscing elit. Try adjusting the text size using the widget. 
+    The dyslexia-friendly font option should also be available.
+  </p>
+  
+  <p>
+    <a href="#test">This is a test link</a> to demonstrate that the highlight links feature is disabled.
+  </p>
+
+  <h3>High Contrast Test</h3>
+  <p>
+    Switch between different high contrast modes to test this feature. All 4 contrast modes should work:
+    Enhanced, Black/White, Black/Yellow, and Dark Mode.
+  </p>
+
+  <div style="background: #f0f0f0; padding: 20px; margin: 20px 0; border-radius: 8px;">
+    <h4>Test Box</h4>
+    <p>This box has a background color to test high contrast modes.</p>
+  </div>
+
+  <h2>Configuration Code</h2>
+  <p>This page uses the following configuration:</p>
+  <pre><code>window.AllyWidgetConfig = {
+  features: {
+    textSize: true,
+    highContrast: true,
+    dyslexia: true,
+    bigCursor: true,
+    pauseAnimation: true,
+    screenReader: true,
+    // All other features: false
+  }
+};</code></pre>
+</body>
+</html>

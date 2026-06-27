@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ally Widget - Configuration Example</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 40px 20px;
+      line-height: 1.6;
+    }
+    
+    h1 {
+      color: #2c3e50;
+      border-bottom: 3px solid #3498db;
+      padding-bottom: 10px;
+    }
+    
+    .config-section {
+      background: #f8f9fa;
+      border-left: 4px solid #3498db;
+      padding: 20px;
+      margin: 30px 0;
+      border-radius: 4px;
+    }
+    
+    .config-section h2 {
+      margin-top: 0;
+      color: #2c3e50;
+    }
+    
+    pre {
+      background: #2c3e50;
+      color: #ecf0f1;
+      padding: 20px;
+      border-radius: 6px;
+      overflow-x: auto;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+    
+    code {
+      background: #e8e8e8;
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-family: 'Courier New', monospace;
+      color: #c7254e;
+    }
+    
+    pre code {
+      background: none;
+      padding: 0;
+      color: #ecf0f1;
+    }
+    
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+      gap: 15px;
+      margin: 20px 0;
+    }
+    
+    .feature-item {
+      background: white;
+      padding: 15px;
+      border-radius: 6px;
+      border: 1px solid #dee2e6;
+    }
+    
+    .feature-item strong {
+      color: #3498db;
+      display: block;
+      margin-bottom: 5px;
+    }
+    
+    .example-box {
+      background: #fff;
+      border: 2px dashed #3498db;
+      padding: 20px;
+      margin: 20px 0;
+      border-radius: 6px;
+    }
+    
+    .example-box h3 {
+      margin-top: 0;
+      color: #3498db;
+    }
+    
+    .note {
+      background: #fff3cd;
+      border-left: 4px solid #ffc107;
+      padding: 15px;
+      margin: 20px 0;
+      border-radius: 4px;
+    }
+    
+    .note strong {
+      color: #856404;
+    }
+  </style>
+  
+  <!-- CONFIGURATION EXAMPLE: Enable only specific features -->
+  <script>
+    // Configure the widget BEFORE including the script
+    window.AllyWidgetConfig = {
+      // Position settings
+      position: "right",        // Options: "left" or "right"
+      buttonOffset: "24px",     // Distance from edge of screen
+      panelWidth: "560px",      // Width of the accessibility panel
+      
+      // Feature toggles - set to false to disable any feature
+      features: {
+        textSize: true,         // Text size adjustment
+        highContrast: true,     // High contrast modes
+        textSpacing: true,      // Text and letter spacing
+        lineHeight: true,       // Line height adjustment
+        dyslexia: true,         // Dyslexia-friendly font
+        adhd: false,            // ADHD focus mode - DISABLED
+        saturation: true,       // Color saturation control
+        invert: false,          // Color inversion - DISABLED
+        bigCursor: true,        // Large cursor
+        hideImages: false,      // Hide images - DISABLED
+        pauseAnimation: true,   // Pause animations
+        highlightLinks: true,   // Highlight all links
+        screenReader: true      // Screen reader functionality
+      }
+    };
+  </script>
+  
+  <!-- Include the Ally Widget -->
+  <script src="ally-widget.js"></script>
+</head>
+<body>
+  <h1>🎨 Ally Widget Configuration Guide</h1>
+  
+  <div class="config-section">
+    <h2>📋 Overview</h2>
+    <p>
+      The Ally Widget now supports feature-level configuration, allowing developers to enable or disable 
+      specific accessibility features based on their project requirements. This gives you complete control 
+      over which features are available to your users.
+    </p>
+  </div>
+
+  <div class="config-section">
+    <h2>🚀 Quick Start</h2>
+    <p>
+      Add the configuration object <strong>before</strong> including the widget script:
+    </p>
+    
+    <pre><code>&lt;script&gt;
+  window.AllyWidgetConfig = {
+    features: {
+      textSize: true,
+      highContrast: true,
+      screenReader: false,  // Disable screen reader
+      adhd: false           // Disable ADHD mode
+      // ... other features
+    }
+  };
+&lt;/script&gt;
+
+&lt;script src="ally-widget.js"&gt;&lt;/script&gt;</code></pre>
+  </div>
+
+  <div class="config-section">
+    <h2>🎛️ Available Features</h2>
+    <p>All features are <strong>enabled by default</strong>. Set any feature to <code>false</code> to disable it:</p>
+    
+    <div class="feature-grid">
+      <div class="feature-item">
+        <strong>textSize</strong>
+        <span>Adjust text size from 100% to 140%</span>
+      </div>
+      <div class="feature-item">
+        <strong>highContrast</strong>
+        <span>High contrast modes including dark mode</span>
+      </div>
+      <div class="feature-item">
+        <strong>textSpacing</strong>
+        <span>Letter and word spacing adjustments</span>
+      </div>
+      <div class="feature-item">
+        <strong>lineHeight</strong>
+        <span>Line height from 1x to 2x</span>
+      </div>
+      <div class="feature-item">
+        <strong>dyslexia</strong>
+        <span>OpenDyslexic font for better readability</span>
+      </div>
+      <div class="feature-item">
+        <strong>adhd</strong>
+        <span>Focus mode to reduce distractions</span>
+      </div>
+      <div class="feature-item">
+        <strong>saturation</strong>
+        <span>Color saturation control and grayscale</span>
+      </div>
+      <div class="feature-item">
+        <strong>invert</strong>
+        <span>Invert colors for visual comfort</span>
+      </div>
+      <div class="feature-item">
+        <strong>bigCursor</strong>
+        <span>Enlarged cursor for better visibility</span>
+      </div>
+      <div class="feature-item">
+        <strong>hideImages</strong>
+        <span>Hide all images and background images</span>
+      </div>
+      <div class="feature-item">
+        <strong>pauseAnimation</strong>
+        <span>Stop all animations and transitions</span>
+      </div>
+      <div class="feature-item">
+        <strong>highlightLinks</strong>
+        <span>Highlight all clickable links</span>
+      </div>
+      <div class="feature-item">
+        <strong>screenReader</strong>
+        <span>Built-in screen reader with speech synthesis</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="example-box">
+    <h3>💡 Example 1: Minimal Configuration</h3>
+    <p>Enable only the most essential features:</p>
+    <pre><code>window.AllyWidgetConfig = {
+  features: {
+    textSize: true,
+    highContrast: true,
+    textSpacing: false,
+    lineHeight: false,
+    dyslexia: true,
+    adhd: false,
+    saturation: false,
+    invert: false,
+    bigCursor: true,
+    hideImages: false,
+    pauseAnimation: true,
+    highlightLinks: false,
+    screenReader: true
+  }
+};</code></pre>
+  </div>
+
+  <div class="example-box">
+    <h3>💡 Example 2: Visual-Only Features</h3>
+    <p>Perfect for content-heavy websites:</p>
+    <pre><code>window.AllyWidgetConfig = {
+  features: {
+    textSize: true,
+    highContrast: true,
+    textSpacing: true,
+    lineHeight: true,
+    dyslexia: true,
+    adhd: false,
+    saturation: true,
+    invert: true,
+    bigCursor: false,
+    hideImages: false,
+    pauseAnimation: false,
+    highlightLinks: false,
+    screenReader: false
+  }
+};</code></pre>
+  </div>
+
+  <div class="example-box">
+    <h3>💡 Example 3: Reading-Focused Configuration</h3>
+    <p>Optimized for blogs and documentation sites:</p>
+    <pre><code>window.AllyWidgetConfig = {
+  features: {
+    textSize: true,
+    highContrast: true,
+    textSpacing: true,
+    lineHeight: true,
+    dyslexia: true,
+    adhd: true,
+    saturation: false,
+    invert: false,
+    bigCursor: false,
+    hideImages: false,
+    pauseAnimation: true,
+    highlightLinks: true,
+    screenReader: true
+  }
+};</code></pre>
+  </div>
+
+  <div class="config-section">
+    <h2>⚙️ Complete Configuration Object</h2>
+    <p>Here's the full configuration object with all available options:</p>
+    <pre><code>window.AllyWidgetConfig = {
+  // Position and Layout
+  position: "right",           // "left" or "right"
+  buttonOffset: "24px",        // Distance from screen edge
+  panelWidth: "560px",         // Width of accessibility panel
+  
+  // Feature Toggles (all default to true)
+  features: {
+    textSize: true,
+    highContrast: true,
+    textSpacing: true,
+    lineHeight: true,
+    dyslexia: true,
+    adhd: true,
+    saturation: true,
+    invert: true,
+    bigCursor: true,
+    hideImages: true,
+    pauseAnimation: true,
+    highlightLinks: true,
+    screenReader: true
+  }
+};</code></pre>
+  </div>
+
+  <div class="note">
+    <strong>💡 Pro Tip:</strong> You only need to specify features you want to disable. 
+    Features not mentioned in the config will remain enabled by default.
+  </div>
+
+  <div class="note">
+    <strong>⚠️ Important:</strong> Make sure to define <code>window.AllyWidgetConfig</code> 
+    <strong>before</strong> including the ally-widget.js script, otherwise your configuration won't be applied.
+  </div>
+
+  <div class="config-section">
+    <h2>🔧 Partial Configuration</h2>
+    <p>You can also use partial configuration - only specify what you want to change:</p>
+    <pre><code>// This will disable only these 3 features, all others remain enabled
+window.AllyWidgetConfig = {
+  features: {
+    adhd: false,
+    hideImages: false,
+    invert: false
+  }
+};</code></pre>
+  </div>
+
+  <div class="config-section">
+    <h2>📱 Testing Your Configuration</h2>
+    <p>
+      On this page, we've disabled <strong>ADHD mode</strong>, <strong>Color Inversion</strong>, 
+      and <strong>Hide Images</strong> features. Open the accessibility widget (bottom right corner) 
+      to see how your configuration affects the available features.
+    </p>
+  </div>
+
+  <div class="config-section">
+    <h2>📚 Use Cases</h2>
+    <ul>
+      <li><strong>Corporate Sites:</strong> Disable features that conflict with branding guidelines</li>
+      <li><strong>E-commerce:</strong> Keep product images visible by disabling hideImages</li>
+      <li><strong>Educational:</strong> Focus on reading features (dyslexia, text spacing, line height)</li>
+      <li><strong>Blogs:</strong> Enable all text and reading-focused features</li>
+      <li><strong>Web Apps:</strong> Disable features that might interfere with UI (like ADHD mask)</li>
+    </ul>
+  </div>
+
+  <div class="config-section">
+    <h2>🎨 Sample Content for Testing</h2>
+    <p>
+      Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut 
+      labore et dolore magna aliqua. Try the accessibility features with this content!
+    </p>
+    <p>
+      <a href="#test">This is a test link</a> that you can use to test the highlight links feature.
+    </p>
+    <h3>Subheading for Testing</h3>
+    <p>
+      Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo 
+      consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat 
+      nulla pariatur.
+    </p>
+  </div>
+</body>
+</html>

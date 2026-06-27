@@ -1,0 +1,43 @@
+﻿{
+  "name": "@preepo/allykit",
+  "version": "1.2.0",
+  "description": "AllyKit — a lightweight, zero-dependency accessibility toolkit for any webpage. Text size, contrast modes, dyslexia font, screen reader, ADHD focus mode, and more.",
+  "main": "ally-kit.js",
+  "module": "ally-kit.js",
+  "browser": "ally-kit.js",
+  "exports": {
+    ".": {
+      "import": "./ally-kit.js",
+      "require": "./ally-kit.js",
+      "default": "./ally-kit.js"
+    }
+  },
+  "files": [
+    "ally-kit.js",
+    "open-dyslexic.woff",
+    "README.md",
+    "LICENSE"
+  ],
+  "keywords": [
+    "accessibility",
+    "a11y",
+    "wcag",
+    "allykit",
+    "screen-reader",
+    "high-contrast",
+    "dyslexia",
+    "widget",
+    "zero-dependency"
+  ],
+  "author": "Pritush M.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/pritush/ally-kit.git"
+  },
+  "bugs": {
+    "url": "https://github.com/pritush/ally-kit/issues"
+  },
+  "homepage": "https://github.com/pritush/ally-kit#readme",
+  "sideEffects": false
+}

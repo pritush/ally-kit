@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Partial Configuration Test - Ally Widget</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 40px 20px;
+      line-height: 1.6;
+    }
+    
+    .status {
+      background: #cfe2ff;
+      border: 1px solid #b6d4fe;
+      color: #084298;
+      padding: 20px;
+      border-radius: 8px;
+      margin: 30px 0;
+    }
+    
+    .info-box {
+      background: #fff3cd;
+      border: 1px solid #ffecb5;
+      color: #664d03;
+      padding: 15px;
+      border-radius: 6px;
+      margin: 20px 0;
+    }
+    
+    .enabled { color: #28a745; }
+    .disabled { color: #dc3545; font-weight: bold; }
+    
+    code {
+      background: #e9ecef;
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-family: monospace;
+    }
+    
+    pre {
+      background: #2c3e50;
+      color: #ecf0f1;
+      padding: 15px;
+      border-radius: 6px;
+      overflow-x: auto;
+    }
+  </style>
+  
+  <!-- PARTIAL CONFIGURATION: Only disable 3 specific features -->
+  <script>
+    window.AllyWidgetConfig = {
+      features: {
+        // Only specify what we want to disable
+        adhd: false,
+        hideImages: false,
+        invert: false
+        // All other features remain enabled (10 features)
+      }
+    };
+  </script>
+  
+  <script src="ally-widget.js"></script>
+</head>
+<body>
+  <h1>🎯 Partial Configuration Test</h1>
+  
+  <div class="status">
+    <strong>Partial Configuration Active:</strong> This page disables only 3 specific features. 
+    All other features (10 total) remain enabled by default.
+  </div>
+
+  <div class="info-box">
+    <strong>💡 Key Concept:</strong> You only need to specify features you want to disable! 
+    This is the most developer-friendly approach.
+  </div>
+
+  <h2>Test Instructions</h2>
+  <ol>
+    <li>Open the accessibility widget (button in bottom-right corner)</li>
+    <li>Verify that you see <strong>10 feature buttons</strong> (not 13)</li>
+    <li>Confirm these 3 features are missing: ADHD Mode, Hide Images, Invert Color</li>
+  </ol>
+
+  <h2>Expected Results</h2>
+  
+  <h3>✅ Enabled Features (Should Appear):</h3>
+  <ol>
+    <li class="enabled">Text Size</li>
+    <li class="enabled">High Contrast</li>
+    <li class="enabled">Text Spacing</li>
+    <li class="enabled">Line Height</li>
+    <li class="enabled">Dyslexia Friendly</li>
+    <li class="enabled">Saturation</li>
+    <li class="enabled">Big Cursor</li>
+    <li class="enabled">Pause Animation</li>
+    <li class="enabled">Highlight Links</li>
+    <li class="enabled">Screen Reader</li>
+  </ol>
+  
+  <h3>❌ Disabled Features (Should NOT Appear):</h3>
+  <ol>
+    <li class="disabled">ADHD Mode</li>
+    <li class="disabled">Hide Images</li>
+    <li class="disabled">Invert Color</li>
+  </ol>
+
+  <h2>Configuration Code</h2>
+  <p>Notice how simple this is - only 3 lines!</p>
+  <pre><code>window.AllyWidgetConfig = {
+  features: {
+    adhd: false,
+    hideImages: false,
+    invert: false
+  }
+};</code></pre>
+
+  <h2>Why This Approach?</h2>
+  <ul>
+    <li><strong>Clean & Simple:</strong> Only specify what you need to change</li>
+    <li><strong>Maintainable:</strong> Easy to understand at a glance</li>
+    <li><strong>Future-proof:</strong> New features will be enabled automatically</li>
+    <li><strong>Less Code:</strong> No need to list all 13 features</li>
+  </ul>
+
+  <h2>Use Case Example</h2>
+  <p>
+    This configuration is perfect for a <strong>web application</strong> where:
+  </p>
+  <ul>
+    <li><strong>ADHD Mode disabled:</strong> The reading mask might obscure important UI elements</li>
+    <li><strong>Hide Images disabled:</strong> Images and icons are functional, not decorative</li>
+    <li><strong>Invert Colors disabled:</strong> Your app has a carefully designed color scheme</li>
+  </ul>
+
+  <h2>Sample Content for Testing</h2>
+  
+  <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='100'%3E%3Crect fill='%234CAF50' width='200' height='100'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='white' font-size='20'%3ETest Image%3C/text%3E%3C/svg%3E" alt="Test Image" style="display: block; margin: 20px 0;">
+  
+  <p>
+    <strong>Notice:</strong> The image above should remain visible because "Hide Images" is disabled.
+  </p>
+
+  <p>
+    Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut 
+    labore et dolore magna aliqua. Try the available accessibility features!
+  </p>
+  
+  <p>
+    <a href="#test">Test link for highlight feature</a> - The highlight links feature should work.
+  </p>
+
+  <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; border-radius: 8px; margin: 20px 0;">
+    <h3 style="margin-top: 0;">Colorful Box</h3>
+    <p style="margin-bottom: 0;">
+      This gradient box demonstrates that color inversion is disabled. The saturation feature should 
+      still work to adjust color intensity.
+    </p>
+  </div>
+
+  <h2>Comparison</h2>
+  <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
+    <thead>
+      <tr style="background: #f8f9fa;">
+        <th style="padding: 10px; text-align: left; border: 1px solid #dee2e6;">Approach</th>
+        <th style="padding: 10px; text-align: left; border: 1px solid #dee2e6;">Lines of Code</th>
+        <th style="padding: 10px; text-align: left; border: 1px solid #dee2e6;">Readability</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td style="padding: 10px; border: 1px solid #dee2e6;">Partial (this page)</td>
+        <td style="padding: 10px; border: 1px solid #dee2e6;">5 lines</td>
+        <td style="padding: 10px; border: 1px solid #dee2e6;">⭐⭐⭐⭐⭐ Excellent</td>
+      </tr>
+      <tr>
+        <td style="padding: 10px; border: 1px solid #dee2e6;">Full specification</td>
+        <td style="padding: 10px; border: 1px solid #dee2e6;">15+ lines</td>
+        <td style="padding: 10px; border: 1px solid #dee2e6;">⭐⭐⭐ Good</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="info-box">
+    <strong>📚 Next Steps:</strong>
+    <ul style="margin: 10px 0 0 0;">
+      <li>Try <code>test-minimal.html</code> for a minimal setup example</li>
+      <li>Check <code>example-config.html</code> for comprehensive documentation</li>
+      <li>Read <code>CONFIGURATION.md</code> for detailed configuration guide</li>
+    </ul>
+  </div>
+</body>
+</html>
