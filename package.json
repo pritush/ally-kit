@@ -1,4 +1,4 @@
-﻿{
+{
   "name": "@preepo/allykit",
   "version": "1.2.1",
   "description": "AllyKit — a lightweight, zero-dependency accessibility toolkit for any webpage. Text size, contrast modes, dyslexia font, screen reader, ADHD focus mode, and more.",
@@ -34,7 +34,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/pritush/ally-kit.git"
+    "url": "git+https://github.com/pritush/ally-kit.git"
   },
   "bugs": {
     "url": "https://github.com/pritush/ally-kit/issues"

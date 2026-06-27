@@ -2,7 +2,7 @@
 
 A lightweight, zero-dependency accessibility toolkit you drop into any webpage with a single `<script>` tag. It gives users a floating button that opens a panel of accessibility tools — text size, contrast modes, dyslexia font, screen reader, ADHD focus mode, and more — all persisted to `localStorage` so preferences carry across pages.
 
-**Version 1.2.0**
+**Version 1.2.1**
 
 ---
 
