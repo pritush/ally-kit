@@ -1,0 +1,82 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Test WCAG Issues</title>
+  <style>
+    body { font-family: system-ui; max-width: 800px; margin: 0 auto; padding: 40px; }
+    .low-contrast { color: #aaa; background: #fff; }
+    .low-contrast-large { color: #aaa; background: #fff; font-size: 24px; }
+    img { margin: 8px; }
+  </style>
+</head>
+<body>
+  <header>Header 1</header>
+  <header>Header 2</header>
+  <header>Header 3</header>
+  <header>Header 4</header>
+
+  <h1>Test WCAG Issues</h1>
+
+  <!-- Test: List item without list parent -->
+  <li>Orphaned list item</li>
+
+  <!-- Test: Empty list item -->
+  <ul>
+    <li>Item 1</li>
+    <li></li>
+    <li>Item 3</li>
+  </ul>
+
+  <!-- Test: Duplicate IDs -->
+  <div id="duplicate">Div 1</div>
+  <div id="duplicate">Div 2</div>
+  <div id="duplicate">Div 3</div>
+  <div id="another-duplicate">Another 1</div>
+  <div id="another-duplicate">Another 2</div>
+  <div id="another-duplicate">Another 3</div>
+
+  <!-- Test: Duplicate for and ID + Multiple form labels -->
+  <label for="input1">Label 1</label>
+  <label for="input1">Label 2</label>
+  <input id="input1" type="text" placeholder="Test input">
+
+  <!-- Test: Invalid ARIA attributes -->
+  <div aria-invalid-attr="true" role="button">Invalid ARIA</div>
+  <button aria-foo="bar" aria-baz="qux">Button with invalid aria</button>
+  <span aria-not-allowed="value">Span with invalid aria</span>
+  <input type="text" aria-random="something">
+
+  <!-- Test: ARIA widget with incorrect owned element -->
+  <div role="listbox" aria-owns="non-existent-id">Listbox</div>
+
+  <!-- Test: Low contrast -->
+  <p class="low-contrast">This is low contrast text</p>
+  <p class="low-contrast-large">This is low contrast large text</p>
+
+  <!-- Test: Images without role/alt -->
+  <img src="test1.jpg">
+  <img src="test2.jpg">
+  <img src="test3.jpg">
+  <img src="test4.jpg">
+  <img src="test5.jpg">
+  <img src="test6.jpg">
+
+  <!-- Test: SVGs missing role="img" -->
+  <svg aria-label="Test SVG" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/></svg>
+  <svg><title>Another SVG</title><rect width="24" height="24"/></svg>
+  <svg aria-labelledby="svg-title"><title id="svg-title">Labeled SVG</title><ellipse cx="12" cy="12" rx="10" ry="8"/></svg>
+
+  <!-- Test: Missing autocomplete -->
+  <input type="email" name="email">
+  <input type="tel" name="phone">
+
+  <!-- Test: Multiple footer landmarks -->
+  <footer>Footer 1</footer>
+  <footer>Footer 2</footer>
+
+  <script src="ally-kit.js"></script>
+</body>
+</html>

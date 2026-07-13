@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html>
+<!-- NOTE: Intentionally missing lang attribute to test auto-fixer -->
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Auto-Fixer Test Page</title>
+  <style>
+    body { font-family: system-ui; max-width: 800px; margin: 0 auto; padding: 40px; }
+    .clickable-div { cursor: pointer; background: #e0e0e0; padding: 12px; margin: 8px 0; border-radius: 4px; }
+    .icon-btn { width: 40px; height: 40px; border: none; cursor: pointer; background: #333; color: white; border-radius: 50%; }
+  </style>
+</head>
+<body>
+  <h1>WCAG 2.2 Auto-Fixer Test</h1>
+  
+  <!-- Test: Image without alt -->
+  <img src="test-photo.jpg">
+  <img src="1234.png">
+  
+  <!-- Test: Input without label -->
+  <input type="text" placeholder="Enter your email">
+  <input type="text" name="phone_number">
+  <input type="email" name="user_email">
+  <input type="text">
+  
+  <!-- Test: Button with no text (icon only) -->
+  <button class="icon-btn"><svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg></button>
+  <button class="icon-btn" title="Settings"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/></svg></button>
+  
+  <!-- Test: Link with no text -->
+  <a href="https://example.com"><img src="logo.png"></a>
+  <a href="/about-us"></a>
+  
+  <!-- Test: Empty heading -->
+  <h3></h3>
+  
+  <!-- Test: Clickable div without keyboard access -->
+  <div class="clickable-div" onclick="alert('clicked')">Click me (div)</div>
+  
+  <!-- Test: Anchor without href -->
+  <a>I look like a link</a>
+  
+  <!-- Test: Content area (for landmark detection) -->
+  <div class="main-content">
+    <p>This is the main content area with enough text to be detected as the primary content region. 
+    Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.</p>
+    <p>More content here to exceed the threshold.</p>
+  </div>
+  
+  <!-- Test: Element with role but no tabindex -->
+  <div role="button">Custom role button</div>
+  
+  <p style="color: #ccc;">This is very low contrast text that should trigger a warning.</p>
+  
+  <script>
+    // Diagnostic: count fixes after AllyKit loads
+    window.addEventListener('load', function() {
+      setTimeout(function() {
+        var fixed = document.querySelectorAll('[data-allykit-fixed]');
+        var skip = document.querySelector('.allykit-skip-link');
+        var report = {
+          version: window.AllyKit ? window.AllyKit.version : 'not loaded',
+          fixedCount: fixed.length,
+          fixedTypes: {},
+          skipLink: !!skip,
+          htmlLang: document.documentElement.getAttribute('lang')
+        };
+        fixed.forEach(function(el) {
+          var type = el.getAttribute('data-allykit-fixed');
+          report.fixedTypes[type] = (report.fixedTypes[type] || 0) + 1;
+        });
+        
+        var resultDiv = document.createElement('div');
+        resultDiv.style.cssText = 'position:fixed;top:10px;left:10px;background:#000;color:#0f0;padding:16px;border-radius:8px;font-family:monospace;font-size:13px;z-index:999999;max-width:400px;white-space:pre-wrap;';
+        resultDiv.id = 'test-results';
+        resultDiv.textContent = 'AUTO-FIXER RESULTS:\n' + JSON.stringify(report, null, 2);
+        document.body.appendChild(resultDiv);
+        console.log('[TEST] Auto-fixer report:', report);
+      }, 500);
+    });
+  </script>
+  <script src="ally-kit.js"></script>
+</body>
+</html>

@@ -1,5 +1,5 @@
-﻿/*!
- * AllyKit v1.2.0
+/*!
+ * AllyKit v1.3.0
  * © Pritush M.
  * MIT License
  *
@@ -25,7 +25,7 @@
 
   if (typeof window !== "undefined" && window.AllyKit && window.AllyKit.version) return {};
 
-  const VERSION = "1.2.0";
+  const VERSION = "1.3.0";
   const ROOT_ID = "allykit-root";
   const STYLE_ID = "allykit-page-styles";
   const MASK_ID = "allykit-adhd-mask";
@@ -61,7 +61,9 @@
     screenReader: "Screen Reader",
     screenReaderOn: "Screen reader on",
     screenReaderOff: "Screen reader off",
-    notSupportedBrowser: "is not supported in this browser"
+    notSupportedBrowser: "is not supported in this browser",
+    autoFixBadge: "issues auto-fixed",
+    skipToContent: "Skip to main content"
   };
 
   // ── Default accent palette ────────────────────────────────────────────────
@@ -168,6 +170,11 @@
     // Single accent colour — drives the entire widget palette.
     // Accepts any 3- or 6-digit CSS hex string (e.g. "#4f46e5" or "#f60").
     accentColor: DEFAULT_ACCENT,
+    // WCAG 2.2 auto-fixer — scans the page and fixes common a11y violations.
+    // Set to false to disable entirely.
+    autoFix: true,
+    // Default lang attribute applied to <html> if missing.
+    autoFixLang: "en",
     // Feature toggles - set to false to disable any feature
     features: {
       textSize: true,
@@ -427,7 +434,36 @@
     var hoverTarget = null;  // last element announced via hover
     var hoverTimer  = null;  // debounce timer
 
+    // NVDA-like behaviour: stay quiet until the user deliberately navigates
+    // (Tab, click, or touch on page content). Prevents speech on load.
+    var isArmed = false;
+    var armListenersActive = false;
+
+    function armFromUserGesture(event) {
+      // Panel interactions should not start reading page content.
+      if (root && event.target && root.contains(event.target)) return;
+      isArmed = true;
+      removeArmListeners();
+    }
+
+    function addArmListeners() {
+      if (armListenersActive) return;
+      armListenersActive = true;
+      document.addEventListener("keydown",     armFromUserGesture, { passive: true });
+      document.addEventListener("mousedown",   armFromUserGesture, { passive: true });
+      document.addEventListener("touchstart",   armFromUserGesture, { passive: true });
+    }
+
+    function removeArmListeners() {
+      if (!armListenersActive) return;
+      armListenersActive = false;
+      document.removeEventListener("keydown",     armFromUserGesture, { passive: true });
+      document.removeEventListener("mousedown",   armFromUserGesture, { passive: true });
+      document.removeEventListener("touchstart",   armFromUserGesture, { passive: true });
+    }
+
     function handleMouseover(event) {
+      if (!isArmed) return;
       // Walk up from the event target to find the nearest interactive ancestor.
       var el = event.target;
       while (el && el !== document.body) {
@@ -458,6 +494,10 @@
     // Non-navigating links (_blank) are announced but not intercepted.
 
     function handleLinkClick(event) {
+      // Clicks are always user-initiated — arm before reading/navigating.
+      isArmed = true;
+      removeArmListeners();
+
       var el = event.target;
       // Walk up to find the closest anchor element.
       while (el && el.tagName && el.tagName.toUpperCase() !== "A") {
@@ -499,6 +539,7 @@
     // announcements. If the element was already announced via mouseover, skip it.
 
     function handleFocus(event) {
+      if (!isArmed) return;
       // Skip widget-internal focus events (e.g. the panel's own buttons).
       if (root && root.contains(event.target)) return;
       // Skip if already pre-announced by the hover handler.
@@ -509,16 +550,27 @@
 
     // ── Enable / Disable ─────────────────────────────────────────────────────
 
-    function enable() {
+    /**
+     * @param {object} [options]
+     * @param {boolean} [options.silent]  Skip the "Screen reader on" announcement
+     *                                    (used when restoring a previous session).
+     */
+    function enable(options) {
+      isArmed = false;
+      addArmListeners();
       document.addEventListener("focusin",   handleFocus,     { passive: true });
       document.addEventListener("mouseover", handleMouseover, { passive: true });
       document.addEventListener("mouseout",  handleMouseout,  { passive: true });
       // capture:true so we intercept clicks before the link fires.
       document.addEventListener("click",     handleLinkClick, true);
-      speak(STRINGS.screenReaderOn, null);
+      if (!(options && options.silent)) {
+        speak(STRINGS.screenReaderOn, null);
+      }
     }
 
     function disable() {
+      removeArmListeners();
+      isArmed = false;
       document.removeEventListener("focusin",   handleFocus,     { passive: true });
       document.removeEventListener("mouseover", handleMouseover, { passive: true });
       document.removeEventListener("mouseout",  handleMouseout,  { passive: true });
@@ -540,16 +592,18 @@
       }
     }
 
-    function toggle(isActive) {
+    function toggle(isActive, options) {
       if (!isSupported) {
         console.warn("[AllyKit] SpeechSynthesis " + STRINGS.notSupportedBrowser);
         return;
       }
-      if (isActive) { enable(); } else { disable(); }
+      if (isActive) { enable(options); } else { disable(); }
     }
 
     /** Called during destroy() — silent teardown, no speech. */
     function teardown() {
+      removeArmListeners();
+      isArmed = false;
       document.removeEventListener("focusin",   handleFocus,     { passive: true });
       document.removeEventListener("mouseover", handleMouseover, { passive: true });
       document.removeEventListener("mouseout",  handleMouseout,  { passive: true });
@@ -562,6 +616,1182 @@
     }
 
     return { isSupported: isSupported, toggle: toggle, teardown: teardown };
+  }());
+
+  // =============================================================
+  // WCAG 2.2 AUTO-FIXER  (client-side accessibility remediation)
+  // =============================================================
+
+  const autoFixer = (function () {
+    const FIXED_ATTR = "data-allykit-fixed";
+    const SKIP_LINK_CLASS = "allykit-skip-link";
+
+    // Map of autocomplete values keyed by common input name/id patterns.
+    const AUTOCOMPLETE_MAP = {
+      email: "email", "e-mail": "email",
+      name: "name", fullname: "name", "full-name": "name", "full_name": "name",
+      fname: "given-name", firstname: "given-name", "first-name": "given-name", "first_name": "given-name", given: "given-name",
+      lname: "family-name", lastname: "family-name", "last-name": "family-name", "last_name": "family-name", surname: "family-name",
+      tel: "tel", phone: "tel", mobile: "tel", telephone: "tel",
+      address: "street-address", street: "street-address", "address-line1": "address-line1",
+      city: "address-level2", state: "address-level1", zip: "postal-code", zipcode: "postal-code", postal: "postal-code", postcode: "postal-code",
+      country: "country-name",
+      username: "username", user: "username",
+      password: "current-password", passwd: "current-password", pass: "current-password",
+      "new-password": "new-password", newpassword: "new-password", "new_password": "new-password",
+      cc: "cc-number", cardnumber: "cc-number", "card-number": "cc-number", "cc-number": "cc-number",
+      "cc-name": "cc-name", cardholder: "cc-name",
+      "cc-exp": "cc-exp", expiry: "cc-exp", expiration: "cc-exp",
+      cvc: "cc-csc", cvv: "cc-csc", "cc-csc": "cc-csc",
+      org: "organization", organization: "organization", company: "organization",
+      bday: "bday", birthday: "bday", dob: "bday", birthdate: "bday", "birth-date": "bday",
+      message: "off", comment: "off", comments: "off",
+      search: "off", query: "off"
+    };
+
+    // Elements fixed with added keyboard listeners need cleanup references.
+    var keyboardHandlers = [];
+    var fixedCount = 0;
+    var warnings = [];
+
+    /**
+     * Check whether an element is inside the AllyKit widget root.
+     */
+    function isWidgetElement(el) {
+      return root && root.contains(el);
+    }
+
+    /**
+     * Mark an element as fixed by AllyKit with a specific fix type.
+     * @param {Element} el
+     * @param {string}  fixType  e.g. "alt", "aria-label", "skip-link"
+     */
+    function markFixed(el, fixType) {
+      var existing = el.getAttribute(FIXED_ATTR);
+      if (existing) {
+        if (existing.indexOf(fixType) === -1) {
+          el.setAttribute(FIXED_ATTR, existing + " " + fixType);
+          fixedCount += 1;
+        }
+      } else {
+        el.setAttribute(FIXED_ATTR, fixType);
+        fixedCount += 1;
+      }
+    }
+
+    /** Whether an input/select/textarea already has a native <label>. */
+    function hasNativeLabel(input) {
+      if (input.id) {
+        var labels = document.getElementsByTagName("label");
+        for (var i = 0; i < labels.length; i++) {
+          if (labels[i].htmlFor === input.id) return true;
+        }
+      }
+      var parentLabel = input.closest("label");
+      return !!(parentLabel && parentLabel.textContent && parentLabel.textContent.trim());
+    }
+
+    /** Update id references after a duplicate id rename. */
+    function retargetIdReferences(oldId, newId) {
+      var labels = document.querySelectorAll('label[for="' + oldId + '"]');
+      for (var i = 0; i < labels.length; i++) {
+        labels[i].setAttribute("for", newId);
+      }
+      var attrNames = ["aria-labelledby", "aria-describedby", "aria-owns", "aria-controls"];
+      var all = document.querySelectorAll("*");
+      for (var j = 0; j < all.length; j++) {
+        var node = all[j];
+        for (var a = 0; a < attrNames.length; a++) {
+          var attr = attrNames[a];
+          var val = node.getAttribute(attr);
+          if (!val) continue;
+          var parts = val.split(/\s+/);
+          var changed = false;
+          for (var p = 0; p < parts.length; p++) {
+            if (parts[p] === oldId) { parts[p] = newId; changed = true; }
+          }
+          if (changed) node.setAttribute(attr, parts.join(" "));
+        }
+      }
+      var anchors = document.querySelectorAll('a[href="#' + oldId + '"]');
+      for (var h = 0; h < anchors.length; h++) {
+        anchors[h].setAttribute("href", "#" + newId);
+      }
+    }
+
+    // ── Fix: Duplicate IDs (WCAG 4.1.1) ───────────────────────────────────
+    function fixDuplicateIds() {
+      var seen = {};
+      var elements = document.querySelectorAll("[id]");
+      for (var i = 0; i < elements.length; i++) {
+        var el = elements[i];
+        if (isWidgetElement(el)) continue;
+        var id = el.id;
+        if (!id) continue;
+        if (seen[id]) {
+          var suffix = seen[id];
+          seen[id] = suffix + 1;
+          var newId = id + "-allykit-" + suffix;
+          retargetIdReferences(id, newId);
+          el.id = newId;
+          markFixed(el, "duplicate-id");
+        } else {
+          seen[id] = 1;
+        }
+      }
+    }
+
+    // ── Fix: Invalid / redundant ARIA (WCAG 4.1.2) ────────────────────────
+    var REDUNDANT_SEMANTIC_ROLES = {
+      HEADER: "banner",
+      FOOTER: "contentinfo",
+      MAIN: "main",
+      NAV: "navigation",
+      TABLE: "table",
+      ARTICLE: "article",
+      ASIDE: "complementary",
+      FORM: "form"
+    };
+
+    // List of valid ARIA attributes (from WAI-ARIA 1.2)
+    var VALID_ARIA_ATTRIBUTES = {
+      "aria-activedescendant": true,
+      "aria-atomic": true,
+      "aria-autocomplete": true,
+      "aria-busy": true,
+      "aria-checked": true,
+      "aria-colcount": true,
+      "aria-colindex": true,
+      "aria-colindextext": true,
+      "aria-colspan": true,
+      "aria-controls": true,
+      "aria-current": true,
+      "aria-describedby": true,
+      "aria-description": true,
+      "aria-details": true,
+      "aria-disabled": true,
+      "aria-dropeffect": true,
+      "aria-errormessage": true,
+      "aria-expanded": true,
+      "aria-flowto": true,
+      "aria-grabbed": true,
+      "aria-haspopup": true,
+      "aria-hidden": true,
+      "aria-invalid": true,
+      "aria-keyshortcuts": true,
+      "aria-label": true,
+      "aria-labelledby": true,
+      "aria-level": true,
+      "aria-live": true,
+      "aria-modal": true,
+      "aria-multiline": true,
+      "aria-multiselectable": true,
+      "aria-orientation": true,
+      "aria-owns": true,
+      "aria-placeholder": true,
+      "aria-posinset": true,
+      "aria-pressed": true,
+      "aria-readonly": true,
+      "aria-relevant": true,
+      "aria-required": true,
+      "aria-roledescription": true,
+      "aria-rowcount": true,
+      "aria-rowindex": true,
+      "aria-rowindextext": true,
+      "aria-rowspan": true,
+      "aria-selected": true,
+      "aria-setsize": true,
+      "aria-sort": true,
+      "aria-valuemax": true,
+      "aria-valuemin": true,
+      "aria-valuenow": true,
+      "aria-valuetext": true
+    };
+
+    // Global ARIA attributes allowed on any element
+    var GLOBAL_ARIA_ATTRIBUTES = {
+      "aria-atomic": true,
+      "aria-busy": true,
+      "aria-controls": true,
+      "aria-current": true,
+      "aria-describedby": true,
+      "aria-description": true,
+      "aria-details": true,
+      "aria-disabled": true,
+      "aria-dropeffect": true,
+      "aria-errormessage": true,
+      "aria-flowto": true,
+      "aria-grabbed": true,
+      "aria-hidden": true,
+      "aria-invalid": true,
+      "aria-keyshortcuts": true,
+      "aria-label": true,
+      "aria-labelledby": true,
+      "aria-live": true,
+      "aria-relevant": true,
+      "aria-roledescription": true
+    };
+
+    // Allowed ARIA attributes per role (only non-global ones)
+    var ROLE_ARIA_ATTRIBUTES = {
+      "button": {
+        "aria-expanded": true,
+        "aria-haspopup": true,
+        "aria-pressed": true
+      },
+      "link": {},
+      "listbox": {
+        "aria-activedescendant": true,
+        "aria-multiselectable": true,
+        "aria-orientation": true,
+        "aria-required": true
+      },
+      "img": {}
+    };
+
+    function fixInvalidAria(scope) {
+      var rootScope = scope || document;
+      var tags = Object.keys(REDUNDANT_SEMANTIC_ROLES);
+      for (var t = 0; t < tags.length; t++) {
+        var tag = tags[t].toLowerCase();
+        var role = REDUNDANT_SEMANTIC_ROLES[tags[t]];
+        var nodes = rootScope.querySelectorAll(tag + "[role='" + role + "']");
+        for (var i = 0; i < nodes.length; i++) {
+          var el = nodes[i];
+          if (isWidgetElement(el)) continue;
+          el.removeAttribute("role");
+          markFixed(el, "redundant-role");
+        }
+      }
+
+      // role="img" is not allowed on <img> — it already has an implicit role.
+      var badImgRoles = rootScope.querySelectorAll("img[role]");
+      for (var r = 0; r < badImgRoles.length; r++) {
+        if (isWidgetElement(badImgRoles[r])) continue;
+        badImgRoles[r].removeAttribute("role");
+        markFixed(badImgRoles[r], "redundant-role");
+      }
+
+      // aria-required is redundant when the native required attribute is present.
+      var requiredInputs = rootScope.querySelectorAll("input[required][aria-required], textarea[required][aria-required], select[required][aria-required]");
+      for (var q = 0; q < requiredInputs.length; q++) {
+        if (isWidgetElement(requiredInputs[q])) continue;
+        requiredInputs[q].removeAttribute("aria-required");
+        markFixed(requiredInputs[q], "redundant-aria");
+      }
+
+      // Required asterisk spans inside labels should be hidden, not labelled.
+      var reqSpans = rootScope.querySelectorAll("label span[aria-label], label abbr[aria-label]");
+      for (var s = 0; s < reqSpans.length; s++) {
+        var span = reqSpans[s];
+        if (isWidgetElement(span)) continue;
+        if ((span.getAttribute("aria-label") || "").toLowerCase() === "required") {
+          span.removeAttribute("aria-label");
+          span.setAttribute("aria-hidden", "true");
+          markFixed(span, "redundant-aria");
+        }
+      }
+
+      // Remove invalid ARIA attributes
+      var allElements = rootScope.querySelectorAll("*");
+      for (var e = 0; e < allElements.length; e++) {
+        var el = allElements[e];
+        if (isWidgetElement(el)) continue;
+        var attrs = el.attributes;
+        var role = el.getAttribute("role");
+        for (var a = attrs.length - 1; a >= 0; a--) {
+          var attr = attrs[a];
+          if (attr.name.startsWith("aria-")) {
+            // First check if the attribute is even a valid ARIA attribute
+            if (!VALID_ARIA_ATTRIBUTES[attr.name]) {
+              el.removeAttribute(attr.name);
+              markFixed(el, "invalid-aria");
+              continue;
+            }
+            // If there's an explicit role, check if the attribute is allowed
+            if (role) {
+              var allowedForRole = GLOBAL_ARIA_ATTRIBUTES[attr.name] || 
+                (ROLE_ARIA_ATTRIBUTES[role] && ROLE_ARIA_ATTRIBUTES[role][attr.name]);
+              if (!allowedForRole) {
+                el.removeAttribute(attr.name);
+                markFixed(el, "invalid-aria");
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // ── Fix: Multiple / duplicate labels (WCAG 1.3.1, 3.3.2) ─────────────
+    function fixLabelIssues(scope) {
+      var rootScope = scope || document;
+
+      // Remove aria-label when a native label already names the control.
+      var labelled = rootScope.querySelectorAll("input[aria-label], textarea[aria-label], select[aria-label]");
+      for (var i = 0; i < labelled.length; i++) {
+        var control = labelled[i];
+        if (isWidgetElement(control)) continue;
+        if (hasNativeLabel(control)) {
+          control.removeAttribute("aria-label");
+          markFixed(control, "duplicate-label");
+        }
+      }
+
+      // Only one label[for] per id — detach extras.
+      var forMap = {};
+      var labels = rootScope.querySelectorAll("label[for]");
+      for (var j = 0; j < labels.length; j++) {
+        var label = labels[j];
+        if (isWidgetElement(label)) continue;
+        var fid = label.getAttribute("for");
+        if (!fid) continue;
+        if (forMap[fid]) {
+          label.removeAttribute("for");
+          markFixed(label, "duplicate-label");
+        } else {
+          forMap[fid] = label;
+        }
+      }
+
+      // label[for] must reference an existing id.
+      for (var k = 0; k < labels.length; k++) {
+        var lbl = labels[k];
+        if (isWidgetElement(lbl)) continue;
+        var targetId = lbl.getAttribute("for");
+        if (!targetId || document.getElementById(targetId)) continue;
+        lbl.removeAttribute("for");
+        markFixed(lbl, "duplicate-label");
+      }
+    }
+
+    // ── Fix: List structure (WCAG 1.3.1) ─────────────────────────────────
+    function fixListStructure(scope) {
+      var items = (scope || document).querySelectorAll("li");
+      for (var i = 0; i < items.length; i++) {
+        var li = items[i];
+        if (isWidgetElement(li)) continue;
+        var parent = li.parentElement;
+        var parentTag = parent && parent.tagName ? parent.tagName.toUpperCase() : "";
+        if (parentTag !== "UL" && parentTag !== "OL" && parentTag !== "MENU") {
+          var list = document.createElement("ul");
+          list.setAttribute(FIXED_ATTR, "list-wrap");
+          li.parentNode.insertBefore(list, li);
+          list.appendChild(li);
+          markFixed(list, "list-wrap");
+          continue;
+        }
+        if (!li.textContent || !li.textContent.trim()) {
+          li.setAttribute("aria-hidden", "true");
+          markFixed(li, "empty-list-item");
+        }
+      }
+    }
+
+    // ── Fix: Extra landmarks (WCAG 1.3.1) ─────────────────────────────────
+    function fixExtraLandmarks() {
+      // <footer> inside blockquote creates a spurious footer landmark.
+      var nestedFooters = document.querySelectorAll("blockquote footer, article footer, aside footer, section footer, nav footer");
+      for (var i = 0; i < nestedFooters.length; i++) {
+        var footer = nestedFooters[i];
+        if (isWidgetElement(footer)) continue;
+        var cite = document.createElement("cite");
+        cite.textContent = footer.textContent;
+        if (footer.className) cite.className = footer.className;
+        cite.setAttribute(FIXED_ATTR, "landmark-demotion");
+        footer.parentNode.replaceChild(cite, footer);
+        markFixed(cite, "landmark-demotion");
+      }
+
+      // Keep only the first header/footer landmark by adding role="presentation" to others
+      var headers = document.querySelectorAll("header");
+      for (var b = 1; b < headers.length; b++) {
+        if (isWidgetElement(headers[b])) continue;
+        headers[b].setAttribute("role", "presentation");
+        markFixed(headers[b], "landmark-demotion");
+      }
+      var footers = document.querySelectorAll("footer");
+      for (var f = 1; f < footers.length; f++) {
+        if (isWidgetElement(footers[f])) continue;
+        footers[f].setAttribute("role", "presentation");
+        markFixed(footers[f], "landmark-demotion");
+      }
+    }
+
+    // ── Fix: Missing alt on images (WCAG 1.1.1) ──────────────────────────
+    function fixImages(scope) {
+      var images = (scope || document).querySelectorAll("img:not([alt])");
+      for (var i = 0; i < images.length; i++) {
+        var img = images[i];
+        if (isWidgetElement(img)) continue;
+        if (img.getAttribute(FIXED_ATTR) && img.getAttribute(FIXED_ATTR).indexOf("alt") !== -1) continue;
+
+        var src = img.getAttribute("src") || "";
+        var filename = src.split("/").pop().split("?")[0].split(".")[0];
+        filename = filename.replace(/[-_]+/g, " ").trim();
+
+        if (filename && filename.length > 1 && filename.length < 80 && !/^\d+$/.test(filename)) {
+          img.setAttribute("alt", filename);
+        } else {
+          img.setAttribute("alt", "");
+          img.setAttribute("role", "presentation");
+        }
+        markFixed(img, "alt");
+      }
+
+      // Decorative images with empty alt should be explicitly presentational.
+      var decorative = (scope || document).querySelectorAll('img[alt=""]:not([role])');
+      for (var d = 0; d < decorative.length; d++) {
+        if (isWidgetElement(decorative[d])) continue;
+        decorative[d].setAttribute("role", "presentation");
+        markFixed(decorative[d], "img-role");
+      }
+    }
+
+    // ── Fix: Unlabelled form inputs (WCAG 1.3.1, 3.3.2) ─────────────────
+    function fixFormInputs(scope) {
+      var inputs = (scope || document).querySelectorAll(
+        "input:not([type='hidden']):not([type='submit']):not([type='button']):not([type='reset']):not([type='image']), textarea, select"
+      );
+      for (var i = 0; i < inputs.length; i++) {
+        var input = inputs[i];
+        if (isWidgetElement(input)) continue;
+        if (hasNativeLabel(input)) continue;
+        if (input.getAttribute(FIXED_ATTR) && input.getAttribute(FIXED_ATTR).indexOf("aria-label") !== -1) continue;
+
+        // Skip if already labelled.
+        if (input.getAttribute("aria-label") || input.getAttribute("aria-labelledby")) continue;
+
+        // Derive a label from placeholder > name > type.
+        var derivedLabel = "";
+        if (input.placeholder && input.placeholder.trim()) {
+          derivedLabel = input.placeholder.trim();
+        } else if (input.name) {
+          derivedLabel = input.name.replace(/[-_\[\]]+/g, " ").trim();
+        } else if (input.type && input.type !== "text") {
+          derivedLabel = input.type;
+        }
+        // Look for nearby text (preceding sibling text node or span).
+        if (!derivedLabel) {
+          var prev = input.previousElementSibling;
+          if (prev && prev.textContent && prev.textContent.trim().length < 60) {
+            derivedLabel = prev.textContent.trim();
+          }
+        }
+        if (derivedLabel) {
+          input.setAttribute("aria-label", derivedLabel);
+          markFixed(input, "aria-label");
+        }
+      }
+    }
+
+    // ── Fix: Autocomplete hints (WCAG 1.3.5) ────────────────────────────
+    function fixAutocomplete(scope) {
+      var inputs = (scope || document).querySelectorAll(
+        "input:not([type='hidden']):not([type='submit']):not([type='button']):not([type='reset']):not([type='checkbox']):not([type='radio']):not([type='file']):not([type='image']):not([type='range']):not([type='color']), select"
+      );
+      for (var i = 0; i < inputs.length; i++) {
+        var input = inputs[i];
+        if (isWidgetElement(input)) continue;
+        if (input.getAttribute("autocomplete")) continue;
+        if (input.getAttribute(FIXED_ATTR) && input.getAttribute(FIXED_ATTR).indexOf("autocomplete") !== -1) continue;
+
+        var identifier = (input.name || input.id || "").toLowerCase().replace(/[-_\s]+/g, "-");
+        // Also check common prefixes/suffixes.
+        var match = AUTOCOMPLETE_MAP[identifier];
+        if (!match) {
+          // Try partial matches.
+          var keys = Object.keys(AUTOCOMPLETE_MAP);
+          for (var k = 0; k < keys.length; k++) {
+            if (identifier.indexOf(keys[k]) !== -1) {
+              match = AUTOCOMPLETE_MAP[keys[k]];
+              break;
+            }
+          }
+        }
+        // Also check input type for email/tel.
+        if (!match && input.type === "email") match = "email";
+        if (!match && input.type === "tel") match = "tel";
+        if (!match && input.type === "url") match = "url";
+        if (!match && input.type === "date") match = "bday";
+        if (!match && input.type === "password") match = "current-password";
+
+        // Infer from placeholder text (e.g. "Enter your email").
+        if (!match && input.placeholder) {
+          var ph = input.placeholder.toLowerCase();
+          if (ph.indexOf("email") !== -1) match = "email";
+          else if (ph.indexOf("phone") !== -1 || ph.indexOf("tel") !== -1) match = "tel";
+          else if (ph.indexOf("name") !== -1) match = "name";
+          else if (ph.indexOf("password") !== -1) match = "current-password";
+        }
+
+        if (match) {
+          input.setAttribute("autocomplete", match);
+          markFixed(input, "autocomplete");
+        }
+      }
+    }
+
+    // ── Fix: Icon-only buttons (WCAG 2.5.3, 4.1.2) ─────────────────────
+    function fixIconButtons(scope) {
+      var buttons = (scope || document).querySelectorAll("button, [role='button']");
+      for (var i = 0; i < buttons.length; i++) {
+        var btn = buttons[i];
+        if (isWidgetElement(btn)) continue;
+        if (btn.getAttribute(FIXED_ATTR) && btn.getAttribute(FIXED_ATTR).indexOf("aria-label") !== -1) continue;
+        if (btn.getAttribute("aria-label") || btn.getAttribute("aria-labelledby")) continue;
+
+        // Check if the button has visible text.
+        var text = (btn.innerText || "").trim();
+        if (text) continue;
+
+        // No text — derive label from title, svg title, or child img alt.
+        var label = "";
+        if (btn.title && btn.title.trim()) {
+          label = btn.title.trim();
+        } else {
+          var svgTitle = btn.querySelector("svg title");
+          if (svgTitle && svgTitle.textContent) {
+            label = svgTitle.textContent.trim();
+          }
+        }
+        if (!label) {
+          var childImg = btn.querySelector("img[alt]");
+          if (childImg && childImg.alt) {
+            label = childImg.alt.trim();
+          }
+        }
+        if (!label) {
+          // Last resort: use aria-describedby or class name.
+          var cls = btn.className;
+          if (typeof cls === "string" && cls) {
+            // Extract meaningful class tokens.
+            var tokens = cls.split(/[\s-_]+/).filter(function (t) {
+              return t.length > 2 && !/^(btn|button|icon|svg|fa|bi|material)$/i.test(t);
+            });
+            if (tokens.length) label = tokens.join(" ");
+          }
+        }
+        if (!label) label = "Button";
+
+        btn.setAttribute("aria-label", label);
+        markFixed(btn, "aria-label");
+      }
+    }
+
+    // ── Fix: Links with no discernible text (WCAG 2.4.4) ────────────────
+    function fixEmptyLinks(scope) {
+      var links = (scope || document).querySelectorAll("a[href]");
+      for (var i = 0; i < links.length; i++) {
+        var link = links[i];
+        if (isWidgetElement(link)) continue;
+        if (link.getAttribute(FIXED_ATTR) && link.getAttribute(FIXED_ATTR).indexOf("aria-label") !== -1) continue;
+        if (link.getAttribute("aria-label") || link.getAttribute("aria-labelledby")) continue;
+
+        var text = (link.innerText || "").trim();
+        if (text) continue;
+
+        // Check for child images with alt.
+        var childImg = link.querySelector("img[alt]");
+        if (childImg && childImg.alt && childImg.alt.trim()) continue;
+
+        // Check for title.
+        if (link.title && link.title.trim()) {
+          link.setAttribute("aria-label", link.title.trim());
+        } else {
+          // Derive from href.
+          var href = link.getAttribute("href") || "";
+          if (href && href !== "#" && href !== "javascript:void(0)") {
+            var parts = href.replace(/^https?:\/\//, "").split("/");
+            var meaningful = parts[parts.length - 1] || parts[0] || "Link";
+            meaningful = meaningful.split("?")[0].split("#")[0].replace(/[-_]+/g, " ").trim();
+            link.setAttribute("aria-label", meaningful || "Link");
+          } else {
+            link.setAttribute("aria-label", "Link");
+          }
+        }
+        markFixed(link, "aria-label");
+      }
+    }
+
+    // ── Fix: Empty headings (WCAG 2.4.6) ────────────────────────────────
+    function fixEmptyHeadings(scope) {
+      var headings = (scope || document).querySelectorAll("h1, h2, h3, h4, h5, h6");
+      for (var i = 0; i < headings.length; i++) {
+        var h = headings[i];
+        if (isWidgetElement(h)) continue;
+        if (h.getAttribute(FIXED_ATTR)) continue;
+        var text = (h.innerText || "").trim();
+        if (!text && !h.querySelector("img[alt], svg")) {
+          h.setAttribute("aria-hidden", "true");
+          markFixed(h, "empty-heading");
+        }
+      }
+    }
+
+    // ── Fix: Clickable div/span without keyboard access (WCAG 4.1.2, 2.1.1) ─
+    function fixClickableElements(scope) {
+      // We only query elements with explicit onclick attributes. 
+      // Querying all elements (*) and checking computed styles is too slow for mutation observers.
+      var candidates = (scope || document).querySelectorAll("[onclick]");
+      for (var i = 0; i < candidates.length; i++) {
+        var el = candidates[i];
+        if (isWidgetElement(el)) continue;
+        if (el.getAttribute(FIXED_ATTR) && el.getAttribute(FIXED_ATTR).indexOf("keyboard-a11y") !== -1) continue;
+
+        var tag = el.tagName ? el.tagName.toUpperCase() : "";
+        // Only fix non-interactive elements that have click handlers.
+        if (tag === "A" || tag === "BUTTON" || tag === "INPUT" || tag === "SELECT" ||
+            tag === "TEXTAREA" || tag === "SUMMARY" || tag === "DETAILS") continue;
+        if (el.getAttribute("role") === "button" || el.getAttribute("role") === "link") continue;
+
+        // Must not already be natively focusable.
+        if (el.tabIndex >= 0 && el.getAttribute("tabindex") !== null) continue;
+
+        el.setAttribute("role", "button");
+        el.setAttribute("tabindex", "0");
+
+        // Add keyboard handler for Enter and Space.
+        var handler = function (event) {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            event.target.click();
+          }
+        };
+        el.addEventListener("keydown", handler);
+        keyboardHandlers.push({ element: el, handler: handler });
+
+        // Add aria-label if the element has no accessible name.
+        if (!el.getAttribute("aria-label") && !el.getAttribute("aria-labelledby")) {
+          var labelText = (el.innerText || el.title || "").trim();
+          if (labelText && labelText.length < 80) {
+            el.setAttribute("aria-label", labelText);
+          }
+        }
+
+        markFixed(el, "keyboard-a11y");
+      }
+    }
+
+    // ── Fix: <a> without href acting as button (WCAG 4.1.2) ─────────────
+    function fixAnchorButtons(scope) {
+      var anchors = (scope || document).querySelectorAll("a:not([href])");
+      for (var i = 0; i < anchors.length; i++) {
+        var a = anchors[i];
+        if (isWidgetElement(a)) continue;
+        if (a.getAttribute(FIXED_ATTR)) continue;
+        if (a.getAttribute("role")) continue;
+
+        a.setAttribute("role", "button");
+        if (!a.getAttribute("tabindex")) {
+          a.setAttribute("tabindex", "0");
+        }
+        markFixed(a, "anchor-button");
+      }
+    }
+
+    // ── Fix: Missing landmark roles (WCAG 1.3.1) ────────────────────────
+    function fixLandmarks() {
+      // Only fix if no <main> element or [role="main"] exists.
+      if (document.querySelector("main, [role='main']")) return;
+
+      // Heuristic: find the largest content container.
+      var candidates = document.querySelectorAll(
+        "#content, #main, #main-content, .content, .main, .main-content, article, [class*='content'], [class*='main']"
+      );
+      var best = null;
+      var bestSize = 0;
+      for (var i = 0; i < candidates.length; i++) {
+        var el = candidates[i];
+        if (isWidgetElement(el)) continue;
+        if (el.getAttribute(FIXED_ATTR)) continue;
+        var size = (el.innerText || "").length;
+        if (size > bestSize) {
+          bestSize = size;
+          best = el;
+        }
+      }
+      if (best && bestSize > 100) {
+        best.setAttribute("role", "main");
+        if (!best.id) best.id = "allykit-main-content";
+        markFixed(best, "landmark");
+      }
+    }
+
+    // ── Fix: Skip-link target focus (WCAG 2.4.1) ─────────────────────────
+    function fixSkipTarget() {
+      var target = document.querySelector(
+        "main, [role='main'], #main-content, #content, #allykit-main-content"
+      );
+      if (!target || isWidgetElement(target)) return;
+      if (!target.id) target.id = "allykit-main-content";
+      if (!target.hasAttribute("tabindex")) {
+        target.setAttribute("tabindex", "-1");
+        markFixed(target, "skip-target");
+      }
+    }
+
+    // ── Fix: Skip-to-content link (WCAG 2.4.1) ──────────────────────────
+    function fixSkipLink() {
+      fixSkipTarget();
+
+      // Check if a skip link already exists.
+      if (document.querySelector("." + SKIP_LINK_CLASS)) return;
+      var existingSkip = document.querySelector(
+        "a[href^='#'][class*='skip'], a[href^='#'][class*='screen-reader'], a[href^='#'].sr-only, a[href^='#'].visually-hidden, a.skip-link"
+      );
+      if (existingSkip) {
+        // Ensure existing skip links are keyboard-visible on focus.
+        if (!existingSkip.classList.contains(SKIP_LINK_CLASS)) {
+          existingSkip.classList.add(SKIP_LINK_CLASS);
+          markFixed(existingSkip, "skip-link");
+        }
+        return;
+      }
+
+      // Find the target.
+      var target = document.querySelector(
+        "main, [role='main'], #main-content, #content, #allykit-main-content"
+      );
+      if (!target) return;
+      if (!target.id) target.id = "allykit-main-content";
+
+      var skipLink = document.createElement("a");
+      skipLink.href = "#" + target.id;
+      skipLink.className = SKIP_LINK_CLASS;
+      skipLink.textContent = STRINGS.skipToContent;
+      skipLink.setAttribute(FIXED_ATTR, "skip-link");
+
+      // Insert as first child of body.
+      if (document.body.firstChild) {
+        document.body.insertBefore(skipLink, document.body.firstChild);
+      } else {
+        document.body.appendChild(skipLink);
+      }
+      fixedCount += 1;
+    }
+
+    // ── Fix: Missing lang on <html> (WCAG 3.1.1) ────────────────────────
+    function fixLang() {
+      var html = document.documentElement;
+      if (html.getAttribute("lang")) return;
+
+      html.setAttribute("lang", config.autoFixLang || "en");
+      html.setAttribute(FIXED_ATTR, "lang");
+      fixedCount += 1;
+    }
+
+    // ── Fix: Non-focusable interactive elements (WCAG 2.1.1) ────────────
+    function fixFocusability(scope) {
+      // Elements with certain roles that must be keyboard-focusable.
+      var roleElements = (scope || document).querySelectorAll(
+        "[role='button']:not([tabindex]), [role='link']:not([tabindex]), [role='tab']:not([tabindex]), [role='menuitem']:not([tabindex])"
+      );
+      for (var i = 0; i < roleElements.length; i++) {
+        var el = roleElements[i];
+        if (isWidgetElement(el)) continue;
+        if (el.getAttribute(FIXED_ATTR) && el.getAttribute(FIXED_ATTR).indexOf("focusable") !== -1) continue;
+
+        var tag = el.tagName ? el.tagName.toUpperCase() : "";
+        if (tag === "A" || tag === "BUTTON" || tag === "INPUT" || tag === "SELECT" || tag === "TEXTAREA") continue;
+
+        el.setAttribute("tabindex", "0");
+        markFixed(el, "focusable");
+      }
+    }
+
+    /**
+     * Pick #000 or #fff whichever meets WCAG AA against the background.
+     */
+    function pickContrastingText(bgHex, isLargeText) {
+      var threshold = isLargeText ? 3 : 4.5;
+      if (contrastRatio("000000", bgHex) >= threshold) return "#000000";
+      if (contrastRatio("ffffff", bgHex) >= threshold) return "#ffffff";
+      return contrastRatio("000000", bgHex) >= contrastRatio("ffffff", bgHex) ? "#000000" : "#ffffff";
+    }
+
+    // ── Fix: Low contrast text (WCAG 1.4.3 / 1.4.6) ─────────────────────
+    function fixLowContrast(scope) {
+      var elements = (scope || document).querySelectorAll(TEXT_SELECTOR);
+      var limit = Math.min(elements.length, 500);
+      for (var i = 0; i < limit; i++) {
+        var el = elements[i];
+        if (isWidgetElement(el)) continue;
+        if (el.hasAttribute("data-allykit-contrast-fixed")) continue;
+        if (!el.textContent || !el.textContent.trim()) continue;
+
+        el.setAttribute("data-allykit-contrast-fixed", "true");
+
+        try {
+          var style = window.getComputedStyle(el);
+          var bgHex = getEffectiveBackground(el);
+          if (!bgHex) continue;
+
+          var fontSize = parseFloat(style.fontSize);
+          var isBold = parseInt(style.fontWeight, 10) >= 700 || style.fontWeight === "bold";
+          var isLargeText = fontSize >= 24 || (fontSize >= 18.66 && isBold);
+          var threshold = isLargeText ? 3 : 4.5;
+
+          var fgHex = colorToHex(style.color);
+          var ratio = fgHex ? contrastRatio(fgHex, bgHex) : 0;
+
+          // Gradient / image backgrounds often return no reliable ratio.
+          var bgImage = style.backgroundImage;
+          var hasComplexBg = bgImage && bgImage !== "none";
+          if (hasComplexBg && ratio < threshold) {
+            el.style.setProperty("background-color", "#" + bgHex, "important");
+            el.style.setProperty("padding", "2px 4px", "important");
+            ratio = fgHex ? contrastRatio(fgHex, bgHex) : 0;
+          }
+
+          if (ratio >= threshold) continue;
+
+          var better = pickContrastingText(bgHex, isLargeText);
+          el.style.setProperty("color", better, "important");
+          markFixed(el, "contrast");
+        } catch (e) { /* getComputedStyle can fail in exotic contexts */ }
+      }
+    }
+
+    // ── Warning: remaining contrast issues we cannot safely auto-fix ─────
+    function checkContrast(scope) {
+      // We only warn — we don't auto-fix contrast because it would break branding.
+      var elements = (scope || document).querySelectorAll(TEXT_SELECTOR);
+      var limit = Math.min(elements.length, 200);
+      var warned = new Set();
+      for (var i = 0; i < limit; i++) {
+        var el = elements[i];
+        if (isWidgetElement(el)) continue;
+        if (el.hasAttribute("data-allykit-contrast-warned")) continue;
+        if (!el.textContent || !el.textContent.trim()) continue;
+        
+        el.setAttribute("data-allykit-contrast-warned", "true");
+        
+        try {
+          var style = window.getComputedStyle(el);
+          var fgHex = colorToHex(style.color);
+          var bgHex = getEffectiveBackground(el);
+          if (!fgHex || !bgHex) continue;
+
+          var ratio = contrastRatio(fgHex, bgHex);
+          var fontSize = parseFloat(style.fontSize);
+          var isBold = parseInt(style.fontWeight, 10) >= 700 || style.fontWeight === "bold";
+          var isLargeText = fontSize >= 24 || (fontSize >= 18.66 && isBold);
+
+          // WCAG AA thresholds.
+          var threshold = isLargeText ? 3 : 4.5;
+          if (ratio < threshold) {
+            var selector = el.tagName.toLowerCase();
+            if (el.id) selector += "#" + el.id;
+            else if (el.className && typeof el.className === "string") selector += "." + el.className.split(" ")[0];
+            if (!warned.has(selector)) {
+              warned.add(selector);
+              warnings.push(
+                "Low contrast (" + ratio.toFixed(2) + ":1) on <" + selector + ">. " +
+                "WCAG AA requires " + threshold + ":1" + (isLargeText ? " for large text" : "") + "."
+              );
+            }
+          }
+        } catch (e) { /* getComputedStyle can fail in exotic contexts */ }
+      }
+    }
+
+    /**
+     * Parse a CSS color string (rgb/rgba) to 6-char hex.
+     */
+    function colorToHex(color) {
+      if (!color) return null;
+      var match = color.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+      if (!match) return null;
+      return (
+        parseInt(match[1], 10).toString(16).padStart(2, "0") +
+        parseInt(match[2], 10).toString(16).padStart(2, "0") +
+        parseInt(match[3], 10).toString(16).padStart(2, "0")
+      );
+    }
+
+    /**
+     * Walk up the DOM to find the first opaque background colour.
+     */
+    function getEffectiveBackground(el) {
+      var current = el;
+      while (current && current !== document.documentElement) {
+        try {
+          var bg = window.getComputedStyle(current).backgroundColor;
+          if (bg && bg !== "rgba(0, 0, 0, 0)" && bg !== "transparent") {
+            return colorToHex(bg);
+          }
+        } catch (e) { break; }
+        current = current.parentElement;
+      }
+      return "ffffff"; // Default to white.
+    }
+
+    /**
+     * Calculate WCAG contrast ratio between two 6-char hex values.
+     */
+    function contrastRatio(hex1, hex2) {
+      var rgb1 = hexToRgb(hex1);
+      var rgb2 = hexToRgb(hex2);
+      var l1 = luminance(rgb1.r, rgb1.g, rgb1.b);
+      var l2 = luminance(rgb2.r, rgb2.g, rgb2.b);
+      var lighter = Math.max(l1, l2);
+      var darker = Math.min(l1, l2);
+      return (lighter + 0.05) / (darker + 0.05);
+    }
+
+    // ── Public API ───────────────────────────────────────────────────────
+
+    // ── Fix: Broken aria-labelledby / aria-describedby / aria-owns references ─────────
+    function fixAriaReferences(scope) {
+      var nodes = (scope || document).querySelectorAll("[aria-labelledby], [aria-describedby], [aria-owns], [aria-controls], [aria-flowto], [aria-activedescendant], [aria-errormessage]");
+      for (var i = 0; i < nodes.length; i++) {
+        var node = nodes[i];
+        if (isWidgetElement(node)) continue;
+        var attrNames = ["aria-labelledby", "aria-describedby", "aria-owns", "aria-controls", "aria-flowto", "aria-activedescendant", "aria-errormessage"];
+        for (var a = 0; a < attrNames.length; a++) {
+          var attr = attrNames[a];
+          var val = node.getAttribute(attr);
+          if (!val) continue;
+          var parts = val.split(/\s+/).filter(Boolean);
+          var valid = parts.filter(function (id) { return !!document.getElementById(id); });
+          if (valid.length === parts.length) continue;
+          if (valid.length) {
+            node.setAttribute(attr, valid.join(" "));
+          } else {
+            node.removeAttribute(attr);
+          }
+          markFixed(node, "aria-ref");
+        }
+      }
+    }
+
+    // ── Fix: SVG images missing role="img" ─────────────────────────────────
+    function fixSvgImages(scope) {
+      var svgs = (scope || document).querySelectorAll("svg");
+      for (var i = 0; i < svgs.length; i++) {
+        var svg = svgs[i];
+        if (isWidgetElement(svg)) continue;
+        if (svg.getAttribute("role")) continue;
+        // If SVG has aria-label, aria-labelledby, or a title child, it's an image
+        if (
+          svg.getAttribute("aria-label") || 
+          svg.getAttribute("aria-labelledby") || 
+          svg.querySelector("title")
+        ) {
+          svg.setAttribute("role", "img");
+          markFixed(svg, "svg-role");
+        }
+      }
+    }
+
+    // ── Fix: External links without rel="noopener noreferrer" ────────────────
+    function fixExternalLinks(scope) {
+      var links = (scope || document).querySelectorAll("a[href]");
+      for (var i = 0; i < links.length; i++) {
+        var link = links[i];
+        if (isWidgetElement(link)) continue;
+        var href = link.getAttribute("href");
+        if (!href) continue;
+        if (href.startsWith("http://") || href.startsWith("https://")) {
+          var rel = link.getAttribute("rel") || "";
+          var relParts = rel.split(/\s+/).filter(Boolean);
+          var hasNoopener = relParts.indexOf("noopener") !== -1;
+          var hasNoreferrer = relParts.indexOf("noreferrer") !== -1;
+          if (!hasNoopener) relParts.push("noopener");
+          if (!hasNoreferrer) relParts.push("noreferrer");
+          if (relParts.length > (rel ? rel.split(/\s+/).filter(Boolean).length : 0)) {
+            link.setAttribute("rel", relParts.join(" "));
+            markFixed(link, "external-link");
+          }
+        }
+      }
+    }
+
+    /**
+     * Scan and fix all detectable WCAG issues in the given scope (or full document).
+     */
+    function scanAndFix(scope) {
+      if (config.autoFix === false) return;
+
+      fixLang();
+      if (!scope) {
+        fixDuplicateIds();
+        fixExtraLandmarks();
+      }
+      fixInvalidAria(scope);
+      fixLabelIssues(scope);
+      fixImages(scope);
+      fixFormInputs(scope);
+      fixAutocomplete(scope);
+      fixIconButtons(scope);
+      fixEmptyLinks(scope);
+      fixEmptyHeadings(scope);
+      fixClickableElements(scope);
+      fixAnchorButtons(scope);
+      fixFocusability(scope);
+      fixListStructure(scope);
+      fixAriaReferences(scope);
+      fixSvgImages(scope);
+      fixExternalLinks(scope);
+
+      // Full-document-only fixes (don't re-run on scoped mutations).
+      if (!scope) {
+        fixLandmarks();
+        fixSkipLink();
+        fixLowContrast();
+        checkContrast();
+      }
+
+      // Log warnings to console.
+      if (warnings.length > 0) {
+        console.groupCollapsed(
+          "[AllyKit] WCAG contrast warnings (" + warnings.length + ")"
+        );
+        for (var w = 0; w < warnings.length; w++) {
+          console.warn(warnings[w]);
+        }
+        console.groupEnd();
+      }
+    }
+
+    /**
+     * Revert all applied fixes — removes attributes, elements, and keyboard listeners.
+     */
+    function revert() {
+      // Remove skip link.
+      var skipLinks = document.querySelectorAll("." + SKIP_LINK_CLASS);
+      for (var s = 0; s < skipLinks.length; s++) {
+        skipLinks[s].remove();
+      }
+
+      // Remove lang fix.
+      var html = document.documentElement;
+      if (html.getAttribute(FIXED_ATTR) === "lang") {
+        html.removeAttribute("lang");
+        html.removeAttribute(FIXED_ATTR);
+      }
+
+      // Remove all data-allykit-fixed elements' added attributes.
+      var fixedElements = document.querySelectorAll("[" + FIXED_ATTR + "]");
+      for (var i = 0; i < fixedElements.length; i++) {
+        var el = fixedElements[i];
+        var fixes = (el.getAttribute(FIXED_ATTR) || "").split(" ");
+        for (var f = 0; f < fixes.length; f++) {
+          switch (fixes[f]) {
+            case "alt":
+              el.removeAttribute("alt");
+              el.removeAttribute("role");
+              break;
+            case "img-role":
+            case "svg-role":
+              el.removeAttribute("role");
+              break;
+            case "aria-label":
+              el.removeAttribute("aria-label");
+              break;
+            case "autocomplete":
+              el.removeAttribute("autocomplete");
+              break;
+            case "empty-heading":
+              el.removeAttribute("aria-hidden");
+              break;
+            case "empty-list-item":
+              el.removeAttribute("aria-hidden");
+              break;
+            case "duplicate-id":
+              break;
+            case "duplicate-label":
+              break;
+            case "redundant-role":
+            case "redundant-aria":
+            case "invalid-aria":
+              break;
+            case "aria-ref":
+              break;
+            case "contrast":
+              el.style.removeProperty("color");
+              el.style.removeProperty("background-color");
+              el.style.removeProperty("padding");
+              break;
+            case "landmark-demotion":
+              if (el.getAttribute("role") === "presentation") {
+                el.removeAttribute("role");
+              }
+              break;
+            case "list-wrap":
+              break;
+            case "skip-target":
+              el.removeAttribute("tabindex");
+              break;
+            case "skip-link":
+              if (el.classList) el.classList.remove(SKIP_LINK_CLASS);
+              break;
+            case "keyboard-a11y":
+              el.removeAttribute("role");
+              el.removeAttribute("tabindex");
+              el.removeAttribute("aria-label");
+              break;
+            case "anchor-button":
+              el.removeAttribute("role");
+              el.removeAttribute("tabindex");
+              break;
+            case "landmark":
+              el.removeAttribute("role");
+              if (el.id === "allykit-main-content") el.removeAttribute("id");
+              break;
+            case "focusable":
+              el.removeAttribute("tabindex");
+              break;
+            case "external-link":
+              var rel = el.getAttribute("rel") || "";
+              var relParts = rel.split(/\s+/).filter(function(part) {
+                return part !== "noopener" && part !== "noreferrer";
+              });
+              if (relParts.length > 0) {
+                el.setAttribute("rel", relParts.join(" "));
+              } else {
+                el.removeAttribute("rel");
+              }
+              break;
+          }
+        }
+        el.removeAttribute(FIXED_ATTR);
+      }
+
+      var contrastFixed = document.querySelectorAll("[data-allykit-contrast-fixed]");
+      for (var c = 0; c < contrastFixed.length; c++) {
+        contrastFixed[c].removeAttribute("data-allykit-contrast-fixed");
+      }
+      var contrastWarned = document.querySelectorAll("[data-allykit-contrast-warned]");
+      for (var c = 0; c < contrastWarned.length; c++) {
+        contrastWarned[c].removeAttribute("data-allykit-contrast-warned");
+      }
+
+      // Remove keyboard handlers.
+      for (var k = 0; k < keyboardHandlers.length; k++) {
+        var ref = keyboardHandlers[k];
+        ref.element.removeEventListener("keydown", ref.handler);
+      }
+      keyboardHandlers = [];
+      fixedCount = 0;
+      warnings = [];
+    }
+
+    /**
+     * Returns a summary of fixes applied.
+     */
+    function getReport() {
+      return {
+        fixed: fixedCount,
+        warnings: warnings.slice()
+      };
+    }
+
+    return {
+      scanAndFix: scanAndFix,
+      revert: revert,
+      getReport: getReport
+    };
   }());
 
   // State is a flat object of primitives, so a shallow clone is correct and cheaper than JSON round-trips.
@@ -904,6 +2134,35 @@
         outline: 3px solid var(--allykit-page-focus-outline) !important;
         outline-offset: 4px !important;
       }
+
+      /* ── Skip-to-content link (injected by auto-fixer) ── */
+      .allykit-skip-link {
+        position: absolute;
+        left: -9999px;
+        top: auto;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        z-index: 2147483647;
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+      }
+      .allykit-skip-link:focus {
+        position: fixed;
+        top: 10px;
+        left: 10px;
+        width: auto;
+        height: auto;
+        padding: 12px 24px;
+        background: #000;
+        color: #fff;
+        font-size: 16px;
+        font-weight: 700;
+        z-index: 2147483647;
+        border-radius: 6px;
+        text-decoration: none;
+        outline: 3px solid #ffff68;
+        outline-offset: 2px;
+      }
     `;
   }
 
@@ -1062,7 +2321,7 @@
       .allykit-header {
         min-height: 64px;
         display: grid;
-        grid-template-columns: auto minmax(0, 1fr) auto auto;
+        grid-template-columns: auto minmax(0, 1fr) auto auto auto;
         gap: 10px;
         align-items: center;
         padding: 10px 14px;
@@ -1087,6 +2346,34 @@
         line-height: 1.2;
         font-weight: 700;
         letter-spacing: 0;
+      }
+
+      .allykit-badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 4px;
+        padding: 2px 10px;
+        border-radius: 999px;
+        background: var(--ak-primary-container);
+        color: var(--ak-on-primary-container);
+        font-size: 0.68em;
+        font-weight: 700;
+        line-height: 1.3;
+        white-space: nowrap;
+        opacity: 0;
+        transform: scale(0.8);
+        transition: opacity 300ms ease, transform 300ms ease;
+      }
+
+      .allykit-badge[data-visible="true"] {
+        opacity: 1;
+        transform: scale(1);
+      }
+
+      .allykit-badge .allykit-icon {
+        width: 14px;
+        height: 14px;
       }
 
       .allykit-icon-button {
@@ -1408,6 +2695,8 @@
     const title = createElement("h2", "allykit-title", { id: "allykit-title" });
     title.textContent = STRINGS.menuTitle;
 
+    // Auto-fix badge removed per request
+
     const reset = createElement("button", "allykit-icon-button allykit-reset-button", {
       type: "button",
       "aria-label": STRINGS.reset
@@ -1562,18 +2851,13 @@
   }
 
   /**
-   * Silently restore the screen-reader focus listener when the page loads
-   * and the user previously had it enabled (no spoken feedback on init).
+   * Silently restore the screen-reader when the page loads and the user
+   * previously had it enabled. Announcements stay muted until the user
+   * navigates (Tab, click, or touch) — same pattern as NVDA on page load.
    */
   function restoreScreenReader() {
     if (state.screenReader && screenReader.isSupported) {
-      // Restore the focusin listener after a short delay so speech doesn't
-      // fire immediately on page load (which would surprise the user).
-      window.setTimeout(function () {
-        if (state.screenReader) {
-          screenReader.toggle(true);
-        }
-      }, 800);
+      screenReader.toggle(true, { silent: true });
     }
   }
 
@@ -1785,15 +3069,58 @@
     });
   }
 
+  // Coalesce auto-fixer re-scans into one pass per animation frame.
+  var autoFixPending = false;
+  function scheduleAutoFixScan(addedNodes) {
+    if (autoFixPending || config.autoFix === false) return;
+    autoFixPending = true;
+    window.requestAnimationFrame(function () {
+      autoFixPending = false;
+      // Re-scan the full document for new nodes (scoped scan is fragile
+      // for mutations that move elements between containers).
+      autoFixer.scanAndFix();
+      updateAutoFixBadge();
+    });
+  }
+
   function observePageChanges() {
-    mutationObserver = new MutationObserver(function () {
+    mutationObserver = new MutationObserver(function (mutations) {
       if (state.pauseAnimation) scheduleMediaPause();
+      // Re-scan for a11y fixes when new nodes are added.
+      if (config.autoFix !== false) {
+        var hasNew = false;
+        for (var m = 0; m < mutations.length; m++) {
+          if (mutations[m].addedNodes && mutations[m].addedNodes.length) {
+            hasNew = true;
+            break;
+          }
+        }
+        if (hasNew) scheduleAutoFixScan();
+      }
     });
 
     mutationObserver.observe(document.body, {
       childList: true,
       subtree: true
     });
+  }
+
+  /**
+   * Update the auto-fix badge in the panel header with the current fix count.
+   */
+  function updateAutoFixBadge() {
+    if (!shadow) return;
+    var badge = shadow.querySelector(".allykit-badge");
+    if (!badge) return;
+    var report = autoFixer.getReport();
+    var textEl = badge.querySelector(".allykit-badge__text");
+    if (report.fixed > 0) {
+      if (textEl) textEl.textContent = report.fixed + " " + STRINGS.autoFixBadge;
+      badge.setAttribute("data-visible", "true");
+      badge.setAttribute("aria-label", report.fixed + " accessibility issues automatically fixed");
+    } else {
+      badge.setAttribute("data-visible", "false");
+    }
   }
 
   function destroy() {
@@ -1803,6 +3130,8 @@
     clearZoom();
     // Silently tear down screen reader (stops speech + removes listener).
     screenReader.teardown();
+    // Revert all auto-fixer changes.
+    autoFixer.revert();
 
     const classList = document.body.classList;
     Object.keys(bodyClasses).forEach(function (key) {
@@ -1847,6 +3176,13 @@
     applyState(false);
     observePageChanges();
     document.addEventListener("keydown", handleKeydown, true);
+
+    // Run the WCAG 2.2 auto-fixer if enabled.
+    if (config.autoFix !== false) {
+      autoFixer.scanAndFix();
+      // Update badge after a short delay to allow the panel to render.
+      window.setTimeout(updateAutoFixBadge, 50);
+    }
 
     // Restore screen reader listener silently if it was active in a previous session.
     restoreScreenReader();
