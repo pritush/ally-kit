@@ -24,7 +24,7 @@
   ],
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 0",
-    "build": "echo \"Build step placeholder - add terser here\"",
+    "build": "terser ally-kit.js -o ally-kit-min.js -m -c",
     "prepublishOnly": "npm run build"
   },
   "keywords": [
@@ -53,5 +53,8 @@
   "sideEffects": false,
   "engines": {
     "node": ">=14.0.0"
+  },
+  "devDependencies": {
+    "terser": "^5.49.0"
   }
 }
