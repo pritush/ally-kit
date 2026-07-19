@@ -2,24 +2,42 @@
 
 A lightweight, zero-dependency accessibility toolkit you drop into any webpage with a single `<script>` tag. It gives users a floating button that opens a panel of accessibility tools — text size, contrast modes, dyslexia font, screen reader, ADHD focus mode, and more — all persisted to `localStorage` so preferences carry across pages.
 
-**Version 1.2.1**
+**Version 1.3.0**
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![npm version](https://img.shields.io/npm/v/@preepo/allykit.svg)](https://www.npmjs.com/package/@preepo/allykit)
+[![Bundle Size](https://img.shields.io/bundlephobia/minzip/@preepo/allykit)](https://bundlephobia.com/package/@preepo/allykit)
+
+## Why AllyKit?
+
+- 🚀 **Zero dependencies** — Pure vanilla JavaScript, no framework required
+- 🎨 **Fully customizable** — Brand colors, position, and feature toggles
+- 💾 **Persistent preferences** — Settings stored in localStorage across sessions
+- ♿ **WCAG 2.2 compliant** — Auto-fixes common accessibility issues
+- 🌐 **Framework agnostic** — Works with React, Vue, Angular, or plain HTML
+- 📦 **Tiny footprint** — ~20KB minified and gzipped
+- 🔧 **No build required** — Works with a single `<script>` tag
 
 ---
 
 ## Table of Contents
 
+- [Why AllyKit?](#why-allykit)
 - [Features](#features)
+- [Demo](#demo)
 - [Installation](#installation)
 - [Usage](#usage)
 - [Configuration](#configuration)
   - [Layout options](#layout-options)
   - [Accent colour](#accent-colour)
   - [Feature toggles](#feature-toggles)
+  - [WCAG Auto-fixer](#wcag-auto-fixer)
 - [Feature reference](#feature-reference)
 - [JavaScript API](#javascript-api)
 - [Keyboard shortcuts](#keyboard-shortcuts)
 - [How settings are stored](#how-settings-are-stored)
 - [Browser support](#browser-support)
+- [Troubleshooting](#troubleshooting)
 - [Contributing](#contributing)
 - [License](#license)
 
@@ -27,23 +45,43 @@ A lightweight, zero-dependency accessibility toolkit you drop into any webpage w
 
 ## Features
 
-| Feature | What it does |
-|---|---|
-| **Text size** | Scales page text to 110 %, 120 %, 130 %, or 140 % |
-| **High contrast** | Four modes: Enhanced · Black/White · Black/Yellow · Dark Mode |
-| **Text spacing** | Three levels of letter + word spacing (Loose → Widest) |
-| **Line height** | Three levels: 1.5 × · 1.8 × · 2 × |
-| **Dyslexia friendly** | Switches body text to [OpenDyslexic](https://opendyslexic.org/) font |
-| **ADHD mode** | Adds a focus strip that follows the cursor to reduce distraction |
-| **Saturation** | Low · High · Grayscale |
-| **Invert colors** | CSS `invert + hue-rotate` over the whole page |
-| **Big cursor** | Replaces the system cursor with an enlarged one |
-| **Hide images** | Hides `<img>`, `<picture>`, and CSS background images |
-| **Pause animations** | Collapses all CSS animations and transitions to 0 ms |
-| **Highlight links** | Wraps every `<a>` in a bright yellow outline |
-| **Screen reader** | Uses the Web Speech API to announce hovered, focused, and clicked elements, and reads link text before navigating |
+| Feature | What it does | WCAG Criteria |
+|---|---|---|
+| **Text size** | Scales page text to 110%, 120%, 130%, or 140% | 1.4.4 (AA) |
+| **High contrast** | Four modes: Enhanced · Black/White · Black/Yellow · Dark Mode | 1.4.3, 1.4.6 (AA/AAA) |
+| **Text spacing** | Three levels of letter + word spacing (Loose → Widest) | 1.4.12 (AA) |
+| **Line height** | Three levels: 1.5× · 1.8× · 2× | 1.4.12 (AA) |
+| **Dyslexia friendly** | Switches body text to [OpenDyslexic](https://opendyslexic.org/) font | 1.4.8 (AAA) |
+| **ADHD mode** | Adds a focus strip that follows the cursor to reduce distraction | 2.4.11 (AA) |
+| **Saturation** | Low · High · Grayscale | 1.4.1 (A) |
+| **Invert colors** | CSS `invert + hue-rotate` over the whole page | 1.4.1 (A) |
+| **Big cursor** | Replaces the system cursor with an enlarged one | 2.5.5 (AAA) |
+| **Hide images** | Hides `<img>`, `<picture>`, and CSS background images | User preference |
+| **Pause animations** | Collapses all CSS animations and transitions to 0ms | 2.3.3 (AAA) |
+| **Highlight links** | Wraps every `<a>` in a bright yellow outline | 2.4.7 (AA) |
+| **Screen reader** | Uses Web Speech API to announce hovered, focused, and clicked elements | 1.3.1, 4.1.2 (A) |
+| **WCAG Auto-fixer** | Automatically fixes common accessibility issues (missing alt text, labels, ARIA attributes) | Multiple |
 
 All 13 features are **enabled by default**. Any subset can be disabled via config.
+
+---
+
+## Demo
+
+🎯 **[Live Demo](https://pritush.github.io/ally-kit/)** — Try all features in action
+
+Or run locally:
+
+```bash
+# Clone the repo
+git clone https://github.com/pritush/ally-kit.git
+cd ally-kit
+
+# Open in browser
+open index.html  # macOS
+start index.html # Windows
+xdg-open index.html # Linux
+```
 
 ---
 
@@ -54,23 +92,42 @@ All 13 features are **enabled by default**. Any subset can be disabled via confi
 Use `ally-kit.js` for development (readable, with comments) or `ally-kit-min.js` for production (minified, smaller payload):
 
 ```html
-<!-- Development — readable source -->
-<script src="ally-kit.js"></script>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>My Accessible Website</title>
+</head>
+<body>
+  <h1>Welcome</h1>
+  <p>Your content here...</p>
+
+  <!-- Add AllyKit at the end of body -->
+  <script src="ally-kit.js"></script>
 </body>
+</html>
 ```
 
+**For production** (minified, ~20% smaller):
+
 ```html
-<!-- Production — minified (~20 % smaller) -->
 <script src="ally-kit-min.js"></script>
 </body>
 ```
 
-AllyKit self-initialises on `DOMContentLoaded` and attaches to `window.AllyKit`.
+AllyKit self-initializes on `DOMContentLoaded` and attaches to `window.AllyKit`.
 
-### npm
+### npm / yarn / pnpm
 
 ```bash
+# npm
 npm install @preepo/allykit
+
+# yarn
+yarn add @preepo/allykit
+
+# pnpm
+pnpm add @preepo/allykit
 ```
 
 ### CDN
@@ -201,11 +258,17 @@ export function useAllyKit(options = {}) {
 ```html
 <script>
   window.AllyKitConfig = {
+    // Position and layout
     position:     "right",    // "left" | "right"
-    buttonOffset: "24px",     // distance from the screen edge
-    panelWidth:   "560px",    // width of the settings panel
-    accentColor:  "#4f46e5",  // any 3- or 6-digit CSS hex colour
+    buttonOffset: "24px",     // Distance from the screen edge
+    panelWidth:   "560px",    // Width of the settings panel
+    accentColor:  "#4f46e5",  // Any 3- or 6-digit CSS hex colour
+    
+    // WCAG auto-fixer
+    autoFix:      true,       // Enable automatic accessibility fixes
+    autoFixLang:  "en",       // Default lang attribute if missing
 
+    // Feature toggles (all enabled by default)
     features: {
       textSize:       true,
       highContrast:   true,
@@ -341,6 +404,34 @@ window.AllyKitConfig = {
   }
 };
 ```
+
+### WCAG Auto-fixer
+
+AllyKit includes a built-in WCAG 2.2 auto-fixer that scans your page and automatically fixes common accessibility issues:
+
+| Issue | Auto-fix |
+|---|---|
+| Missing `alt` attributes on images | Adds `alt=""` for decorative images or descriptive text from context |
+| Form inputs without labels | Generates labels from nearby text or adds `aria-label` |
+| Missing `lang` attribute on `<html>` | Adds default language (configurable via `autoFixLang`) |
+| Links/buttons without accessible names | Adds `aria-label` from visible text or context |
+| Duplicate IDs | Renames duplicates to ensure uniqueness |
+| Missing ARIA roles | Adds semantic roles where appropriate |
+| Redundant role attributes | Removes roles that match native semantics |
+| Skip-to-content link | Adds a keyboard-accessible skip link if missing |
+
+**Configuration:**
+
+```js
+window.AllyKitConfig = {
+  autoFix: true,        // Enable/disable auto-fixer (default: true)
+  autoFixLang: "en"     // Default lang attribute (default: "en")
+};
+```
+
+The auto-fixer runs on page load and monitors for dynamically added content. Fixed elements are marked with `data-allykit-fixed` attribute. A badge displays the number of issues fixed.
+
+**Note:** Auto-fixes are client-side only and don't modify your source code. For permanent fixes, address issues at the source.
 
 ---
 
@@ -516,14 +607,57 @@ localStorage.removeItem("allyKitSettings");
 
 ## Browser support
 
-| Browser | Version |
-|---|---|
-| Chrome / Edge | 88 + |
-| Firefox | 85 + |
-| Safari | 14 + |
-| Opera | 74 + |
+| Browser | Minimum Version | Notes |
+|---|---|---|
+| Chrome / Edge | 88+ | Full support |
+| Firefox | 85+ | Full support |
+| Safari | 14+ | Full support |
+| Opera | 74+ | Full support |
+| Mobile Safari (iOS) | 14+ | Full support |
+| Chrome Android | 88+ | Full support |
 
-AllyKit uses Shadow DOM, `MutationObserver`, `localStorage`, and optionally `SpeechSynthesis`. It has no polyfills and no runtime dependencies.
+**Required browser features:**
+- Shadow DOM (for style encapsulation)
+- `MutationObserver` (for dynamic content tracking)
+- `localStorage` (for preference persistence)
+- `SpeechSynthesis` API (optional, for screen reader feature)
+
+AllyKit gracefully degrades if optional features are unavailable. No polyfills required.
+
+---
+
+## Troubleshooting
+
+### Widget doesn't appear
+
+1. **Check console for errors** — Open browser DevTools and look for JavaScript errors
+2. **Verify script is loaded** — Make sure the script path is correct and file is accessible
+3. **Check for conflicting CSS** — Ensure no other styles are hiding `#allykit-root`
+4. **Test in a clean environment** — Try on a minimal HTML page to rule out conflicts
+
+### Configuration not applied
+
+1. **Define config before script** — `window.AllyKitConfig` must be set **before** the `<script>` tag
+2. **Check config syntax** — Ensure valid JavaScript object syntax (commas, quotes)
+3. **Verify property names** — Feature keys are case-sensitive
+
+### Screen reader not working
+
+1. **Check browser compatibility** — Some browsers don't support `SpeechSynthesis`
+2. **Check permissions** — Some browsers require user interaction first
+3. **Test with simple content** — Hover over a button or link to trigger speech
+
+### Styles bleeding in/out
+
+AllyKit uses Shadow DOM to prevent style conflicts. If you see issues:
+1. **Check for `!important` rules** — These can pierce Shadow DOM boundaries
+2. **Verify widget isolation** — The widget should be inside `#allykit-root`
+
+### Performance issues
+
+1. **Disable unused features** — Set unused features to `false` in config
+2. **Limit auto-fixer scope** — If you have many DOM nodes, auto-fixer might be slow
+3. **Check for large pages** — Text zoom and filters can be CPU-intensive on massive pages
 
 ---
 

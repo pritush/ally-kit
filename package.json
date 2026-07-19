@@ -5,8 +5,10 @@
   "main": "ally-kit.js",
   "module": "ally-kit.js",
   "browser": "ally-kit.js",
+  "types": "ally-kit.d.ts",
   "exports": {
     ".": {
+      "types": "./ally-kit.d.ts",
       "import": "./ally-kit.js",
       "require": "./ally-kit.js",
       "default": "./ally-kit.js"
@@ -15,20 +17,28 @@
   "files": [
     "ally-kit.js",
     "ally-kit-min.js",
+    "ally-kit.d.ts",
     "open-dyslexic.woff",
     "README.md",
     "LICENSE"
   ],
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 0",
+    "build": "echo \"Build step placeholder - add terser here\"",
+    "prepublishOnly": "npm run build"
+  },
   "keywords": [
     "accessibility",
     "a11y",
     "wcag",
+    "wcag2.2",
     "allykit",
     "screen-reader",
     "high-contrast",
     "dyslexia",
     "widget",
-    "zero-dependency"
+    "zero-dependency",
+    "typescript"
   ],
   "author": "Pritush M.",
   "license": "MIT",
@@ -40,5 +50,8 @@
     "url": "https://github.com/pritush/ally-kit/issues"
   },
   "homepage": "https://github.com/pritush/ally-kit#readme",
-  "sideEffects": false
+  "sideEffects": false,
+  "engines": {
+    "node": ">=14.0.0"
+  }
 }
